@@ -96,7 +96,7 @@
 
     /* Layout */
     --container-max: 1200px;
-    --nav-height: 72px;
+    --nav-height: 96px;
 }
 
 /* ── Reset & Base ── */
@@ -324,7 +324,7 @@ textarea {
 }
 
 .logo-img {
-    height: 56px;
+    height: 80px;
     width: auto;
     object-fit: contain;
     animation: logoPulse 4s ease-in-out infinite;

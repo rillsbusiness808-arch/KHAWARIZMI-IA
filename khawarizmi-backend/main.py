@@ -72,10 +72,10 @@ class Settings(BaseSettings):
     debug:           bool = False
 
     # ── Database ─────────────────────────────────────────
-    database_url:    str  = "postgresql+asyncpg://user:password@localhost:5432/khawarizmi"
+    database_url:    str  = ""
 
     # ── Redis ─────────────────────────────────────────────
-    redis_url:       str  = "redis://localhost:6379/0"
+    redis_url:       str  = ""
     cache_ttl:       int  = 3600          # 1 heure
 
     # ── Auth JWT ──────────────────────────────────────────

@@ -324,7 +324,7 @@ textarea {
 }
 
 .logo-img {
-    height: 80px;
+    height: 150px;
     width: auto;
     object-fit: contain;
     animation: logoPulse 4s ease-in-out infinite;

@@ -154,12 +154,18 @@ async def lifespan(app: FastAPI):
 
     # ── Résolution data_dir ─────────────────────────────
     data_dir = cfg.data_dir
+    if data_dir and not Path(data_dir).exists():
+        logger.warning(f"⚠️ DATA_DIR configuré ({data_dir}) introuvable, tentative de fallback.")
+        data_dir = ""
+
     if not data_dir:
         parent = Path(__file__).parent.parent.resolve()
         if (parent / "programme_maths_3as.json").exists():
             data_dir = str(parent)
-        else:
+        elif (Path(__file__).parent / "data").exists():
             data_dir = str(Path(__file__).parent / "data")
+        else:
+            data_dir = str(Path(__file__).parent / "data") # force to data
 
     logger.info(f"📚 Data dir : {data_dir}")
 
@@ -189,8 +195,12 @@ async def lifespan(app: FastAPI):
 
     # ── PostgreSQL ──────────────────────────────────────
     try:
+        db_url = cfg.database_url
+        if db_url and db_url.startswith("postgresql://"):
+            db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
         state.db_engine = create_async_engine(
-            cfg.database_url,
+            db_url,
             pool_size       = 10,
             max_overflow    = 20,
             pool_pre_ping   = True,

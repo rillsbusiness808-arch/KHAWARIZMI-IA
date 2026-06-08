@@ -1058,6 +1058,15 @@ async def get_schema(
 
 
 # ═══════════════════════════════════════════════════════════════
+# ROUTES — HEALTH & ROOT
+# ═══════════════════════════════════════════════════════════════
+
+@app.get("/")
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "message": "Khawarizmi API v1.0 is running"}
+
+# ═══════════════════════════════════════════════════════════════
 # ROUTES — WAITLIST (sans auth requise)
 # ═══════════════════════════════════════════════════════════════
 

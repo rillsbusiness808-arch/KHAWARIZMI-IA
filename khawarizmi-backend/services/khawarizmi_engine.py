@@ -1,0 +1,594 @@
+# services/khawarizmi_engine.py — VERSION 2.0 CORRIGÉE
+
+import json
+import os
+import re
+import logging
+from typing import Optional, Dict, Any
+
+logger = logging.getLogger('khawarizmi.engine')
+
+MODES_PEDAGOGIQUES = {
+    'FEYNMAN': {
+        'instruction': """
+Explique ce concept avec des mots simples.
+Utilise une analogie de la vie quotidienne algérienne.
+Maximum 150 mots. L'élève doit comprendre le POURQUOI avant le COMMENT.
+""",
+        'output_format': 'texte',
+    },
+    'RAPPEL_ACTIF': {
+        'instruction': """
+Génère 3 questions progressives sur ce concept.
+Question 1 : Facile (définition)
+Question 2 : Intermédiaire (application)
+Question 3 : Difficile (type BAC)
+Attends la réponse de l'élève avant de corriger.
+""",
+        'output_format': 'texte',
+    },
+    'MIND_MAP': {
+        'instruction': """
+Génère un plan structuré du concept en Markdown UNIQUEMENT.
+Format strict :
+# Titre Principal
+## Sous-concept 1
+- Point clé 1
+- Point clé 2
+## Sous-concept 2
+...
+Maximum 20 lignes. Clair. Hiérarchique.
+""",
+        'output_format': 'markdown',
+    },
+    'FLASHCARDS': {
+        'instruction': """
+Génère 5 flashcards recto-verso sur ce concept.
+UNIQUEMENT du JSON valide. Aucun texte avant ou après.
+Format strict :
+[
+  {"question": "...", "reponse": "..."},
+  {"question": "...", "reponse": "..."}
+]
+""",
+        'output_format': 'json',
+    },
+    'ANNALES_COMPLEXES': {
+        'instruction': """
+Tu es en mode Error Autopsy.
+L'élève a soumis une réponse. Diagnostique et guide.
+Méthode Socratique : jamais de réponse directe.
+Voir le traitement spécifique dans la base de connaissances.
+""",
+        'output_format': 'json_autopsy',
+    },
+    'MODE_EXAMEN': {
+        'instruction': """
+Tu es en mode Examen.
+Évalue strictement la réponse de l'élève selon le barème officiel des annales.
+""",
+        'output_format': 'json_autopsy',
+    }
+}
+
+BLOOM_TAXONOMY_AR = {
+    1: {"niveau": "التذكر", "verbes": ["عرّف", "اذكر", "عدّد", "سطّر", "سم", "ضع البيانات"], "code": "BLOOM_L1_RECALL"},
+    2: {"niveau": "الفهم", "verbes": ["اشرح", "علّل", "استخلص", "فسّر"], "code": "BLOOM_L2_UNDERSTAND"},
+    3: {"niveau": "التطبيق", "verbes": ["احسب", "طبّق", "صنّف", "أنجز", "لوّن", "صف"], "code": "BLOOM_L3_APPLY"},
+    4: {"niveau": "التحليل", "verbes": ["قارن", "ميّز", "فرّق", "استنتج", "رتّب", "أثبت"], "code": "BLOOM_L4_ANALYZE"},
+    5: {"niveau": "التأليف", "verbes": ["حوصل", "اقترح", "أعط تفسيرا", "استخلص"], "code": "BLOOM_L5_SYNTHESIZE"},
+}
+
+def detecter_niveau_bloom(texte_question: str) -> dict:
+    for niveau, data in sorted(BLOOM_TAXONOMY_AR.items(), reverse=True):
+        for verbe in data["verbes"]:
+            if verbe in texte_question:
+                return {"niveau": niveau, "label": data["niveau"], "code": data["code"]}
+    return {"niveau": 1, "label": "التذكر", "code": "BLOOM_L1_RECALL"}
+
+class KhawarizmiTutor:
+
+    def __init__(self, data_dir: str):
+        self.data_dir = data_dir
+        self.programme_maths    = self._charger_json(data_dir, 'programme_maths_3as.json')
+        self.annales_maths      = self._charger_json(data_dir, 'annales_maths_3as.json')
+        self.programme_physique = self._charger_json(data_dir, 'programme_physique_3as.json', optional=True)
+        self.programme_sciences = self._charger_json(data_dir, 'programme_sciences_3as.json', optional=True)
+        self.annales_sciences   = self._charger_json(data_dir, 'annales_sciences_3as.json', optional=True)
+
+        self._index_questions        = self._construire_index()
+        self._index_micro_concepts   = self._construire_index_micro_concepts()
+
+        logger.info(f"KhawarizmiTutor initialisé : "
+                   f"{len(self._index_questions)} sujets, "
+                   f"{len(self._index_micro_concepts)} micro-concepts")
+
+    def _charger_json(self, data_dir: str, filename: str, optional: bool = False) -> dict:
+        filepath = os.path.join(data_dir, filename)
+        if not os.path.exists(filepath):
+            if optional:
+                logger.info(f"Fichier optionnel absent (ignoré) : {filename}")
+                return {}
+            raise FileNotFoundError(f"Fichier requis manquant : {filepath}")
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                logger.info(f"Chargé : {filename} ({len(str(data))} chars)")
+                return data
+        except json.JSONDecodeError as e:
+            if optional:
+                logger.error(f"JSON invalide dans {filename} : {e}")
+                return {}
+            raise ValueError(f"Erreur JSON dans {filename}: {e}")
+
+    def _construire_index(self) -> dict:
+        """
+        Index {sujet_id: {question_id: question_data}}.
+        ADAPTE la navigation selon la structure réelle du JSON.
+        """
+        index = {}
+        
+        sources = [
+            ('maths', self.annales_maths),
+            ('sciences', self.annales_sciences)
+        ]
+        
+        for matiere, annales in sources:
+            if not isinstance(annales, list) and not isinstance(annales, dict):
+                continue
+                
+            sujets = annales.get('sujets', []) if isinstance(annales, dict) else annales
+            
+            for sujet in sujets:
+                sujet_id = sujet.get('id') or sujet.get('sujet_id')
+                if not sujet_id:
+                    continue
+                index[sujet_id] = {}
+
+                # Support des deux structures possibles :
+                # Structure A : sujet.questions (liste plate)
+                # Structure B : sujet.exercices[].sous_questions ou exercices[].questions (hiérarchique)
+
+                if 'questions' in sujet:
+                    # Structure A (plate)
+                    for q in sujet.get('questions', []):
+                        q_id = q.get('id') or q.get('question_id')
+                        if q_id:
+                            index[sujet_id][q_id] = {'question': q, 'sujet': sujet, 'matiere': matiere}
+
+                elif 'exercices' in sujet:
+                    # Structure B (hiérarchique)
+                    for ex in sujet.get('exercices', []):
+                        questions = ex.get('sous_questions', []) or ex.get('questions', [])
+                        for sq in questions:
+                            q_id = sq.get('id') or sq.get('question_id')
+                            if q_id:
+                                index[sujet_id][q_id] = {
+                                    'question':  sq,
+                                    'exercice':  ex,
+                                    'sujet':     sujet,
+                                    'matiere':   matiere
+                                }
+
+        logger.info(f"Index construit : {sum(len(v) for v in index.values())} questions total")
+        return index
+
+    def _construire_index_micro_concepts(self) -> dict:
+        index = {}
+        programmes = [self.programme_maths, self.programme_sciences]
+        for programme in programmes:
+            if not programme:
+                continue
+            # Some programmes might be a list directly, or a dict with 'chapitres'
+            chapitres = programme.get('chapitres', []) if isinstance(programme, dict) else programme
+            for chapitre in chapitres:
+                for mc in chapitre.get('micro_concepts', []):
+                    mc_id = mc.get('id')
+                    if mc_id:
+                        index[mc_id] = {'micro_concept': mc, 'chapitre': chapitre}
+        logger.info(f"Index MC : {len(index)} micro-concepts")
+        return index
+
+    def _get_question(self, sujet_id: str, question_id: str) -> dict:
+        if sujet_id not in self._index_questions:
+            available = list(self._index_questions.keys())[:5]
+            raise ValueError(f"Sujet '{sujet_id}' introuvable. Disponibles : {available}")
+        if question_id not in self._index_questions[sujet_id]:
+            available = list(self._index_questions[sujet_id].keys())[:5]
+            raise ValueError(f"Question '{question_id}' introuvable. Disponibles : {available}")
+        return self._index_questions[sujet_id][question_id]
+
+    def _get_socratic_treatment_for_error(self, mc_id: str, error_id: str) -> dict:
+        if not mc_id:
+            logger.warning("mc_id vide")
+            return {}
+
+        mc_data = self._index_micro_concepts.get(mc_id)
+        if not mc_data:
+            logger.warning(f"MC introuvable : '{mc_id}'")
+            return {}
+
+        if not error_id:
+            logger.debug(f"Pas d'error_id pour MC={mc_id}")
+            return {}
+
+        mc        = mc_data['micro_concept']
+        chapitre  = mc_data['chapitre']
+        autopsy   = mc.get('error_autopsy', {})
+
+        cat_map = {
+            'concept':   'TYPE_1',
+            'methode':   'TYPE_2',
+            'execution': 'TYPE_3',
+            'panique':   'TYPE_4',
+        }
+
+        for category, errors in autopsy.items():
+            if not isinstance(errors, list):
+                continue
+            for err in errors:
+                if err.get('id') == error_id:
+                    logger.debug(f"Traitement trouvé : {error_id} → {cat_map.get(category)}")
+                    return {
+                        'type_erreur':           cat_map.get(category, 'INCONNU'),
+                        'description_erreur':    err.get('description', ''),
+                        'traitement_socratique': err.get('traitement_socratique', ''),
+                        'micro_concept_nom':     mc.get('nom', ''),
+                        'chapitre_nom':          chapitre.get('nom', ''),
+                    }
+
+        logger.warning(f"Erreur '{error_id}' introuvable dans MC='{mc_id}'")
+        return {}
+
+    # ═══ PRÉ-ANALYSE ════════════════════════════════════════════
+
+    def pre_analyser_sans_ia(self, sujet_id, question_id, student_input) -> Optional[dict]:
+        try:
+            data = self._get_question(sujet_id, question_id)
+        except ValueError as e:
+            logger.warning(f"pre_analyser_sans_ia : {e}")
+            return None
+
+        question      = data['question']
+        type_question = question.get('type_exercice', '')
+        mc_id         = question.get('micro_concept_id', '')
+
+        logger.debug(f"Pré-analyse : type={type_question} mc={mc_id}")
+
+        if type_question == 'loi_probabilite' or mc_id == 'MC_PROBA_03':
+            return self._verifier_somme_probabilites(student_input)
+
+        if 'reponse_numerique_attendue' in question:
+            return self._verifier_resultat_numerique(
+                student_input,
+                question.get('reponse_numerique_attendue'),
+                question.get('pattern_recherche'),
+            )
+
+        logger.debug("Aucun pré-analyseur applicable")
+        return None
+
+    def _verifier_somme_probabilites(self, text: str) -> Optional[dict]:
+        fractions = re.findall(r'(\d+)/(\d+)', text)
+        if len(fractions) < 2:
+            return None
+
+        denom = int(fractions[0][1])
+        if not all(int(d) == denom for _, d in fractions):
+            return None
+
+        somme_num  = sum(int(n) for n, _ in fractions)
+        somme_tot  = somme_num / denom
+
+        if abs(somme_tot - 1.0) > 0.001:
+            manque = denom - somme_num
+            return {
+                'erreur_detectee': True,
+                'type_erreur':    'TYPE_3',
+                'diagnostic':     f"Somme des probabilites = {somme_num}/{denom} != 1. Il manque {manque}/{denom}.",
+                'hint_socratique': f"Verifie la somme de tes probabilites : {' + '.join([f'{n}/{d}' for n,d in fractions])} = ?",
+                'economie_tokens': 200,
+            }
+
+        return {
+            'erreur_detectee': False,
+            'diagnostic':     f"Somme des probabilites = 1 [OK]",
+            'type_erreur':   'AUCUNE',
+            'economie_tokens': 200,
+        }
+
+    def _verifier_resultat_numerique(
+        self,
+        text: str,
+        reponse_attendue: Optional[float],
+        pattern: Optional[str] = None,
+    ) -> Optional[dict]:
+
+        if reponse_attendue is None:
+            return None
+
+        nombre = None
+
+        if pattern:
+            match = re.search(pattern, text)
+            if match:
+                try:
+                    nombre = float(match.group(1))
+                except (ValueError, IndexError):
+                    return None
+        else:
+            # Chercher les décimaux (plus fiable que tous les entiers)
+            decimaux = re.findall(r'-?\d+\.\d+', text)
+            if decimaux:
+                nombre = float(decimaux[-1])
+
+        if nombre is None:
+            return None
+
+        if abs(nombre - reponse_attendue) > 0.01:
+            return {
+                'erreur_detectee': True,
+                'type_erreur':    'TYPE_3',
+                'diagnostic':     f"Trouve : {nombre} | Attendu : {reponse_attendue}",
+                'economie_tokens': 150,
+            }
+
+        return {
+            'erreur_detectee': False,
+            'diagnostic':     f"Resultat correct : {nombre} [OK]",
+            'type_erreur':   'AUCUNE',
+            'economie_tokens': 150,
+        }
+
+    # ═══ ROUTING ET MODES PÉDAGOGIQUES ══════════════════════════
+
+    def router_par_niveau(self, niveau: int, score_actuel: float, demande_visuel: bool = False) -> str:
+        """
+        Décide quelle méthode pédagogique activer.
+        Basé sur le niveau SM-2 (0-4) et le score actuel (0-1).
+        """
+        if demande_visuel:
+            return 'MIND_MAP'
+        if niveau <= 1 or score_actuel < 0.40:
+            return 'FEYNMAN'
+        elif niveau == 2 or score_actuel < 0.70:
+            return 'RAPPEL_ACTIF'
+        elif niveau == 3 or score_actuel < 0.90:
+            return 'ANNALES_COMPLEXES'
+        else:
+            return 'MODE_EXAMEN'
+
+    # ═══ BUILD_SYSTEM_PROMPT ════════════════════════════════════
+
+    def build_system_prompt(
+        self,
+        sujet_id:      str,
+        question_id:   str,
+        student_input:  str,
+        pre_analyse:   Optional[dict] = None,
+        niveau_sm2:    int = 0,
+        score_actuel:  float = 0.0,
+        mode_force:    Optional[str] = None
+    ) -> str:
+
+        data     = self._get_question(sujet_id, question_id)
+        question = data['question']
+        sujet    = data['sujet']
+        exercice = data.get('exercice', {})
+
+        mc_id  = question.get('micro_concept_id', '')
+        err_id = question.get('diagnostic_erreur_cible', '')
+        
+        bloom_info = detecter_niveau_bloom(question.get('texte', question.get('question', '')))
+        niveau_cognitif = bloom_info['label']
+
+        # ─── Diagnostic — KB prime sur pré-analyse ──────────────
+        db_treatment = self._get_socratic_treatment_for_error(mc_id, err_id)
+
+        if db_treatment:
+            type_erreur     = db_treatment.get('type_erreur', 'INCONNU')
+            hint_socratique = db_treatment.get('traitement_socratique', '')
+            chapitre_nom    = db_treatment.get('chapitre_nom', '')
+        elif pre_analyse and pre_analyse.get('erreur_detectee'):
+            type_erreur     = pre_analyse.get('type_erreur', 'INCONNU')
+            hint_socratique = pre_analyse.get('hint_socratique', '')
+            chapitre_nom    = ''
+        else:
+            type_erreur     = 'INCONNU'
+            hint_socratique = ''
+            chapitre_nom    = ''
+
+        # Si KB n'a pas de hint mais pré-analyse en a un → enrichir
+        if not hint_socratique and pre_analyse:
+            hint_socratique = pre_analyse.get('hint_socratique', '')
+
+        # ─── Diagnostic pré-analyse ──────────────────────────────
+        pre_analyse_str = (
+            f"Diagnostic automatique : {pre_analyse.get('diagnostic', 'N/A')}"
+            if pre_analyse
+            else "Aucune pré-analyse disponible."
+        )
+
+        # ─── Instruction hint ────────────────────────────────────
+        hint_instruction = (
+            f"→ Indice socratique validé à utiliser : '{hint_socratique}'"
+            if hint_socratique
+            else "→ Aucun indice prédéfini : génère ta propre question socratique."
+        )
+
+        # ─── Méthode socratique ──────────────────────────────────
+        methode = self._get_methode_socratique(
+            type_erreur, hint_socratique, mc_id, chapitre_nom
+        )
+
+        matiere = data.get('matiere', 'maths')
+        nom_matiere = "Sciences Expérimentales" if matiere == 'sciences' else "Mathématiques"
+        
+        bloc_minhajiya = ""
+        if matiere == 'sciences':
+            bloc_minhajiya = """
+━━━ MÉTHODOLOGIE SCIENCES (MINHAJIYA) ━━━
+En Sciences, tu DOIS évaluer si l'élève respecte la méthode scientifique stricte, pas juste s'il a le bon mot-clé.
+Si la question demande un "Analyse (تحليل)", l'élève DOIT :
+1. Définir le document (تمثل الوثيقة...)
+2. Faire une lecture descriptive rigoureuse (نلاحظ تزايد / تناقص / ثبات) SANS interpréter. S'il dit "نلاحظ طرح" (on observe une libération) au lieu de "نلاحظ تزايد" (on observe une augmentation), c'est une ERREUR DE MÉTHODE.
+3. Conclure en liant la condition et le résultat.
+Si la question demande un "Interprétation (تفسير)", l'élève DOIT répondre au Pourquoi (لماذا) et au Comment (كيف) en utilisant ses acquis et les données.
+→ Si l'élève ne respecte pas cette rigueur, corrige-le doucement sur sa méthodologie avant de valider le contenu !
+"""
+
+        mode_id = mode_force if mode_force else self.router_par_niveau(niveau_sm2, score_actuel)
+        mode_config = MODES_PEDAGOGIQUES.get(mode_id, MODES_PEDAGOGIQUES['ANNALES_COMPLEXES'])
+        instruction_mode = mode_config['instruction']
+
+        format_output = ""
+        if mode_config['output_format'] == 'json_autopsy':
+            format_output = f"""
+━━━ FORMAT JSON OBLIGATOIRE ━━━
+{{
+    "type_erreur": "{type_erreur}",
+    "ce_qui_est_correct": "<commence par reconnaître ce qui est juste>",
+    "question_socratique": "<ta question pour guider>",
+    "indice_si_bloque": "<si l'élève reste bloqué après 2 échanges>",
+    "feedback_bienveillant": "<message complet à l'élève>"
+}}
+"""
+        elif mode_config['output_format'] == 'json':
+            format_output = """
+━━━ FORMAT JSON OBLIGATOIRE ━━━
+Génère UNIQUEMENT du JSON valide. Aucun texte en dehors du JSON.
+"""
+        else:
+            format_output = f"━━━ FORMAT ATTENDU : {mode_config['output_format'].upper()} ━━━"
+
+        prompt = f"""
+Tu es KHAWARIZMI, tuteur expert du BAC algérien en {nom_matiere}.
+
+━━━ PHILOSOPHIE ABSOLUE ━━━
+Tu ne donnes JAMAIS la réponse directement.
+Tu guides l'élève vers la compréhension par des QUESTIONS.
+Tu commences TOUJOURS par reconnaître ce qui est correct.
+Tu es bienveillant mais précis.
+
+━━━ CONTEXTE ━━━
+BAC {sujet.get('annee', '?')} | {sujet.get('filiere', '?')}
+Exercice : {exercice.get('titre', sujet.get('theme_principal', '?'))}
+Question : {question.get('id', '?')} — {question.get('texte', question.get('question', '?'))}
+Points : {question.get('points', '?')}
+Micro-concept : {mc_id} ({chapitre_nom})
+Niveau Cognitif (Bloom) : {niveau_cognitif} ({bloom_info['code']})
+
+━━━ SOLUTION OFFICIELLE (CONFIDENTIELLE) ━━━
+{json.dumps(question.get('solution', {}), ensure_ascii=False, indent=2)}
+
+━━━ RÉPONSE DE L'ÉLÈVE ━━━
+{student_input}
+
+━━━ DIAGNOSTIC ━━━
+Type d'erreur : {type_erreur}
+{pre_analyse_str}
+
+━━━ ERREURS FRÉQUENTES ━━━
+{json.dumps(question.get('erreurs_frequentes', []), ensure_ascii=False, indent=2)}
+
+━━━ MÉTHODE SOCRATIQUE ━━━
+{methode}
+{bloc_minhajiya}
+
+━━━ INSTRUCTION PÉDAGOGIQUE (MODE: {mode_id}) ━━━
+{instruction_mode}
+
+━━━ RÈGLES ━━━
+→ Tu ne dois JAMAIS inventer de faits, de dates, ou de formules.
+→ Si la réponse n'est pas dans le texte fourni, tu dois répondre : 'Cette information n'est pas dans le programme officiel actuel.'
+→ Ne révèle JAMAIS la solution officielle
+→ Commence par ce qui est CORRECT dans la réponse de l'élève
+→ Pose UNE seule question (pas plusieurs)
+→ Réponds en français ou arabe selon la langue de l'élève
+{hint_instruction}
+{format_output}
+""".strip()
+
+        logger.debug(f"Prompt construit : {len(prompt)} chars | type={type_erreur}")
+        return prompt
+
+    def _get_methode_socratique(
+        self,
+        type_erreur:     str,
+        hint_socratique: str,
+        mc_id:           str = '',
+        chapitre_nom:    str = '',
+    ) -> str:
+
+        contexte = f"Chapitre : {chapitre_nom}" if chapitre_nom else ""
+
+        if hint_socratique:
+            return f"""
+{contexte}
+Erreur {type_erreur} identifiée.
+→ Utilise cet indice expert : "{hint_socratique}"
+→ Formule-le comme une question ouverte à l'élève.
+→ Ne révèle pas la réponse. Juste guide.
+"""
+
+        methodes = {
+            'TYPE_1': f"""
+{contexte} | Erreur de CONCEPT.
+→ L'élève ne comprend pas le fondement théorique.
+→ Question d'ouverture : "Qu'est-ce que tu comprends par [concept] ?"
+→ Guide vers la définition avant tout calcul.
+""",
+            'TYPE_2': f"""
+{contexte} | Erreur de MÉTHODE.
+→ L'élève comprend le concept mais utilise la mauvaise approche.
+→ Question : "Quelle est la première étape pour ce type de problème ?"
+→ Guide vers la bonne technique. Ne la nomme pas.
+""",
+            'TYPE_3': f"""
+{contexte} | Erreur d'EXÉCUTION.
+→ La démarche est correcte. Erreur de calcul ou de manipulation.
+→ Question : "Vérifie ton calcul. Que trouves-tu ?"
+→ Ne montre pas où est l'erreur. L'élève doit la trouver.
+""",
+            'TYPE_4': f"""
+{contexte} | Erreur d'OMISSION.
+→ L'élève sait mais oublie une étape.
+→ Question : "Est-ce que ta réponse est complète ?"
+→ Guide vers l'étape manquante sans la nommer.
+""",
+            'INCONNU': """
+Type d'erreur non identifié.
+→ Commence par : "Explique-moi ta démarche étape par étape."
+→ Écoute. Identifie le type. Puis guide.
+""",
+        }
+
+        return methodes.get(type_erreur, methodes['INCONNU'])
+
+    async def interroger_ia(
+        self,
+        sujet_id: str,
+        question_id: str,
+        student_input: str,
+        **kwargs
+    ) -> str:
+        """
+        Méthode principale : construit le prompt ET appelle l'IA.
+        Actuellement ce lien est absent du fichier.
+        """
+        prompt = self.build_system_prompt(
+            sujet_id, question_id, student_input, **kwargs
+        )
+        # Appel à connecter ici avec le service LLM
+        raise NotImplementedError(
+            "Connecter ici openai / anthropic / google-generativeai"
+        )
+
+
+_instance = None
+
+def get_tutor(data_dir: str) -> 'KhawarizmiTutor':
+    global _instance
+    if _instance is None:
+        _instance = KhawarizmiTutor(data_dir)
+    return _instance

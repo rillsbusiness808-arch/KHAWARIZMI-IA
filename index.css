@@ -506,7 +506,7 @@ textarea {
 
 .logo-bg-1 {
     width: 240px;
-    left: 10%;
+    right: 10%;
     top: 15%;
     opacity: 0.15;
     animation: logoPulseBg 6s ease-in-out infinite;

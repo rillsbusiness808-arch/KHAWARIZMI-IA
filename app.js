@@ -403,7 +403,7 @@ function initWaitlistModal() {
             let saved = false;
 
             /* ── 1. Essai : webhook/API réelle ── */
-            const WEBHOOK_URL = ''; // 👈 Coller ici ton URL (FormSpree, Make, n8n, etc.)
+            const WEBHOOK_URL = 'https://khawarizmi-ia-production.up.railway.app/api/waitlist';
 
             if (WEBHOOK_URL) {
                 try {

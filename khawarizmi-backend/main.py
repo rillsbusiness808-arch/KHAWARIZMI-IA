@@ -201,6 +201,30 @@ async def lifespan(app: FastAPI):
             class_       = AsyncSession,
             expire_on_commit = False,
         )
+
+        # ── Auto-migration : exécute migrations/*.sql ──
+        try:
+            migrations_dir = Path(__file__).parent / "migrations"
+            if migrations_dir.exists():
+                sql_files = sorted(migrations_dir.glob("*.sql"))
+                async with state.db_engine.begin() as conn:
+                    for sql_file in sql_files:
+                        sql_content = sql_file.read_text(encoding="utf-8")
+                        # Split par ; pour exécuter chaque statement
+                        statements = [
+                            s.strip() for s in sql_content.split(";")
+                            if s.strip() and not s.strip().startswith("--")
+                        ]
+                        for stmt in statements:
+                            try:
+                                await conn.execute(text(stmt))
+                            except Exception as e:
+                                logger.warning(
+                                    f"Migration {sql_file.name} stmt skipped: {e}"
+                                )
+                logger.info(f"✅ Migrations appliquées : {len(sql_files)} fichiers")
+        except Exception as e:
+            logger.error(f"⚠️ Erreur migration : {e}")
         # Test de connexion
         async with state.db_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
@@ -506,6 +530,82 @@ async def health_check():
         },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# WAITLIST — Inscription des élèves intéressés
+# ═══════════════════════════════════════════════════════════════
+
+class WaitlistEntry(BaseModel):
+    name:   str       = Field(..., min_length=2, max_length=50)
+    email:  EmailStr
+    wilaya: Optional[str] = Field(None, max_length=50)
+    lang:   Optional[str] = Field("fr", max_length=5)
+    source: Optional[str] = "landing_page"
+
+
+@app.post("/api/waitlist", status_code=201)
+async def add_to_waitlist(entry: WaitlistEntry):
+    """Inscription à la liste d'attente Khawarizmi."""
+    try:
+        if not state.db_engine:
+            logger.warning(f"📧 Waitlist (no DB) : {entry.email}")
+            return {
+                "status":  "queued",
+                "message": "Inscription enregistrée (mode dégradé)",
+                "email":   entry.email
+            }
+
+        async with state.db_session() as session:
+            await session.execute(
+                text("""
+                    INSERT INTO waitlist
+                        (name, email, wilaya, lang, source, created_at, updated_at)
+                    VALUES
+                        (:name, :email, :wilaya, :lang, :source, NOW(), NOW())
+                    ON CONFLICT (email) DO UPDATE SET
+                        updated_at = NOW(),
+                        source     = EXCLUDED.source
+                """),
+                {
+                    "name":   entry.name,
+                    "email":  entry.email,
+                    "wilaya": entry.wilaya,
+                    "lang":   entry.lang,
+                    "source": entry.source,
+                }
+            )
+            await session.commit()
+
+        logger.info(f"✅ Waitlist : {entry.email} ({entry.wilaya or 'N/A'})")
+        return {
+            "status":  "success",
+            "message": "Inscription réussie",
+            "email":   entry.email
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Waitlist error : {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de l'inscription"
+        )
+
+
+@app.get("/api/waitlist/count")
+async def get_waitlist_count():
+    """Compteur public d'inscrits."""
+    if not state.db_engine:
+        return {"count": 0}
+    try:
+        async with state.db_session() as session:
+            result = await session.execute(
+                text("SELECT COUNT(*) FROM waitlist")
+            )
+            return {"count": result.scalar() or 0}
+    except Exception as e:
+        logger.error(f"Waitlist count error: {e}")
+        return {"count": 0}
 
 
 # ═══════════════════════════════════════════════════════════════

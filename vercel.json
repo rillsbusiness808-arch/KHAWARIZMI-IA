@@ -18,8 +18,8 @@
       "dest": "/translations.js"
     },
     {
-      "src": "/index.css",
-      "dest": "/index.css"
+      "src": "/main.css",
+      "dest": "/main.css"
     },
     {
       "src": "/KHAWARIZMI.png",
@@ -68,7 +68,7 @@
     },
 
     {
-      "source": "/index.css",
+      "source": "/main.css",
       "headers": [
         {
           "key": "Cache-Control",

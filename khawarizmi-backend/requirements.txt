@@ -10,6 +10,9 @@ tenacity
 numpy
 scikit-learn
 onnxruntime
+optimum[onnxruntime]
+transformers
+torch
 sentence-transformers
 fsrs
 python-jose[cryptography]

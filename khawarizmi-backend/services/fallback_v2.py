@@ -119,7 +119,18 @@ SYNONYMES = {
     "arn_polymerase": [
         r"arn\s+polymerase",
         r"بوليميراز",
-        r"انزيم\s+(?:الـ\s*)?arn\s+بوليميراز"
+        r"انزيم\s+(?:الـ\s*)?arn\s+بوليميراز",
+        r"بوليميراز\s+arn",
+        r"إنزيم\s+بوليميراز",
+        r"rna\s+polymerase"
+    ],
+    "ARN polymérase": [
+        r"arn\s+polymerase",
+        r"بوليميراز",
+        r"انزيم\s+(?:الـ\s*)?arn\s+بوليميراز",
+        r"بوليميراز\s+arn",
+        r"إنزيم\s+بوليميراز",
+        r"rna\s+polymerase"
     ],
     "transcription": [
         r"transcription",
@@ -135,7 +146,335 @@ SYNONYMES = {
         r"arnm",
         r"arn\s+messager",
         r"(?:الـ\s*)?arnm",
-        r"حمض\s+نووي\s+ريبوزي\s+رسول"
+        r"حمض\s+نووي\s+ريبوزي\s+رسول",
+        r"الحمض\s+النووي\s+الريبوزي\s+المرسال",
+        r"arn\s+رسول",
+        r"arnm\s+ناضج"
+    ],
+    "ARNm": [
+        r"arnm",
+        r"arn\s+messager",
+        r"(?:الـ\s*)?arnm",
+        r"حمض\s+نووي\s+ريبوزي\s+رسول",
+        r"الحمض\s+النووي\s+الريبوزي\s+المرسال",
+        r"arn\s+رسول",
+        r"arnm\s+ناضج"
+    ],
+    "brin transcrit": [
+        r"الخيط\s+المنقول",
+        r"الشريط\s+المنسوخ",
+        r"خيط\s+القالب",
+        r"brin\s+transcrit",
+        r"brin\s+template",
+        r"brin\s+matrice"
+    ],
+    "brin_transcrit": [
+        r"الخيط\s+المنقول",
+        r"الشريط\s+المنسوخ",
+        r"خيط\s+القالب",
+        r"brin\s+transcrit",
+        r"brin\s+template",
+        r"brin\s+matrice"
+    ],
+    "intron": [
+        r"(?:ال)?قطعه\s+غير\s+داله",
+        r"(?:ال)?مقطع\s+غير\s+مشفر",
+        r"(?:ال)?انترون"
+    ],
+    "exon": [
+        r"(?:ال)?قطعه\s+داله",
+        r"(?:ال)?مقطع\s+مشفر",
+        r"(?:ال)?اكسون"
+    ],
+    "codon": [
+        r"(?:ال)?رامزه",
+        r"(?:ال)?كودون",
+        r"ثلاثي\s+نكليوتيد"
+    ],
+    "anticodon": [
+        r"مضاد\s*(?:ال)?رامزه",
+        r"(?:ال)?حامل\s+الثلاثي",
+        r"anticodon"
+    ],
+    "ribosome": [
+        r"(?:ال)?ريبوزوم",
+        r"(?:ال)?ريبوسوم",
+        r"ribosome"
+    ],
+    "polysome": [
+        r"متعدد\s*(?:ال)?ريبوزوم",
+        r"(?:ال)?بوليزوم",
+        r"polyribosome",
+        r"polysome"
+    ],
+    "liaison peptidique": [
+        r"(?:ال)?رابطه\s*(?:ال)?ببتيديه",
+        r"(?:ال)?وصل\s*(?:ال)?ببتيدي",
+        r"liaison\s+peptidique"
+    ],
+    "liaison_peptidique": [
+        r"(?:ال)?رابطه\s*(?:ال)?ببتيديه",
+        r"(?:ال)?وصل\s*(?:ال)?ببتيدي",
+        r"liaison\s+peptidique"
+    ],
+    "translocation": [
+        r"(?:ال)?انزلاق",
+        r"(?:ال)?ازاحه\s*(?:ال)?ريبوزوميه",
+        r"translocation"
+    ],
+    "méthionine": [
+        r"(?:ال)?ميثيونين",
+        r"حمض\s+اميني\s+اول",
+        r"methionine"
+    ],
+    "methionine": [
+        r"(?:ال)?ميثيونين",
+        r"حمض\s+اميني\s+اول",
+        r"methionine"
+    ],
+    "aminoacyl-ARNt synthétase": [
+        r"(?:ال)?تنشيط",
+        r"امينو\s+اسيل",
+        r"سينتيتار",
+        r"النزيم\s+النوعي",
+        r"aminoacyl\s+arn",
+        r"aminoacyl\s+trna"
+    ],
+    "aminoacyl_arnt_synthetase": [
+        r"(?:ال)?تنشيط",
+        r"امينو\s+اسيل",
+        r"سينتيتار",
+        r"النزيم\s+النوعي",
+        r"aminoacyl\s+arn",
+        r"aminoacyl\s+trna"
+    ],
+    "أمينو أسيل ARNt سينتيتار": [
+        r"(?:ال)?تنشيط",
+        r"امينو\s+اسيل",
+        r"سينتيتار",
+        r"النزيم\s+النوعي",
+        r"aminoacyl\s+arn",
+        r"aminoacyl\s+trna"
+    ],
+    "codon stop": [
+        r"(?:ال)?توقف",
+        r"(?:ال)?موقفه",
+        r"stop"
+    ],
+    "codon_stop": [
+        r"(?:ال)?توقف",
+        r"(?:ال)?موقفه",
+        r"stop"
+    ],
+    "stop_codons": [
+        r"(?:ال)?توقف",
+        r"(?:ال)?موقفه",
+        r"stop"
+    ],
+    "codon initiateur": [
+        r"(?:ال)?انطلاق",
+        r"(?:ال)?بدايه",
+        r"start",
+        r"aug"
+    ],
+    "codon_initiateur": [
+        r"(?:ال)?انطلاق",
+        r"(?:ال)?بدايه",
+        r"start",
+        r"aug"
+    ],
+    "AUG_start": [
+        r"(?:ال)?انطلاق",
+        r"(?:ال)?بدايه",
+        r"start",
+        r"aug"
+    ],
+    "dégénérescence": [
+        r"(?:ال)?تدهور",
+        r"متدهور",
+        r"(?:ال)?انحلال",
+        r"منحل",
+        r"redundancy",
+        r"degenere"
+    ],
+    "degenere": [
+        r"(?:ال)?تدهور",
+        r"متدهور",
+        r"(?:ال)?انحلال",
+        r"منحل",
+        r"redundancy",
+        r"degenere"
+    ],
+    "autoradiographie": [
+        r"اشعاع",
+        r"autoradiographie",
+        r"autoradiography"
+    ],
+    "miqr_synthesis": [
+        r"مقر.*تركيب",
+        r"نواه",
+        r"noyau",
+        r"synthesis\s+site"
+    ],
+    "ARNm_migration": [
+        r"هجره",
+        r"يهاجر",
+        r"انتقال",
+        r"migration",
+        r"transfert"
+    ],
+    "brin_transcrit_polarite": [
+        r"3'-tacggatcc-5'",
+        r"3'\s*(?:vers|to|إلى)\s*5'",
+        r"3'\s*->\s*5'"
+    ],
+    "substitution_T_vers_U": [
+        r"t\s*->\s*u",
+        r"t\s*(?:vers|إلى)\s*u",
+        r"استبدال\s+t\s+ب\s+u"
+    ],
+    "site_A_P": [
+        r"site\s+a",
+        r"site\s+p",
+        r"الموقع\s+a",
+        r"الموقع\s+p"
+    ],
+    "anticodon_codon": [
+        r"anticodon",
+        r"codon",
+        r"الرامزة\s+المضادة",
+        r"الرامزة"
+    ],
+    "H2O": [
+        r"فقدان\s+جزيء\s+ماء",
+        r"فقدان\s+h2o",
+        r"perte\s+d'une\s+molecule\s+d'eau",
+        r"h2o"
+    ],
+    "epissage_eucaryotes": [
+        r"ابساج",
+        r"قطع\s+و\s*وصل",
+        r"اقصاء\s*(?:ال)?انترون",
+        r"حذف\s*(?:ال)?قطع",
+        r"epissage",
+        r"splicing"
+    ],
+    "couplage_procaryotes": [
+        r"اقترan",
+        r"متزامن",
+        r"couplage"
+    ],
+    "enveloppe_nucleaire": [
+        r"غلاف\s+نووي",
+        r"غشاء\s+نووي",
+        r"نواه",
+        r"نوى",
+        r"nucle[ou]s",
+        r"enveloppe\s+nucleaire"
+    ],
+    "universel": [
+        r"عالميه",
+        r"عالمي",
+        r"universal"
+    ],
+    "non_chevauchant": [
+        r"غير\s+متداخل",
+        r"non\s+chevauchant"
+    ],
+    "rer": [
+        r"(?:ال)?شبكه\s*(?:ال)?هيوليه\s*(?:ال)?فعاله",
+        r"(?:ال)?شبكه\s*(?:ال)?هيوليه\s*(?:ال)?محببه",
+        r"reticulum\s+endoplasmique",
+        r"rer"
+    ],
+    "الشبكة الهيولية الفعالة": [
+        r"(?:ال)?شبكه\s*(?:ال)?هيوليه\s*(?:ال)?فعاله",
+        r"(?:ال)?شبكه\s*(?:ال)?هيوليه\s*(?:ال)?محببه",
+        r"reticulum\s+endoplasmique",
+        r"rer"
+    ],
+    "appareil_de_golgi": [
+        r"جهاز\s+غولجي",
+        r"جهاز\s+كولجي",
+        r"golgi",
+        r"dictyosome"
+    ],
+    "جهاز غولجي": [
+        r"جهاز\s+غولجي",
+        r"جهاز\s+كولجي",
+        r"golgi",
+        r"dictyosome"
+    ],
+    "vesicules_de_secretion": [
+        r"حويصلات\s+افرازيه",
+        r"vesicules\s+de\s+secretion"
+    ],
+    "حويصلات إفرازية": [
+        r"حويصلات\s+افرازيه",
+        r"vesicules\s+de\s+secretion"
+    ],
+    "site_d_attachement": [
+        r"موقع\s+تثبيت",
+        r"موقع\s+ربط",
+        r"attachement"
+    ],
+    "موقع تثبيت": [
+        r"موقع\s+تثبيت",
+        r"موقع\s+ربط",
+        r"attachement"
+    ],
+    "الرامزة المضادة": [
+        r"مضاد\s*(?:ال)?رامزه",
+        r"(?:ال)?حامل\s+الثلاثي",
+        r"anticodon"
+    ],
+    "المضاد الرامزة": [
+        r"مضاد\s*(?:ال)?رامزه",
+        r"(?:ال)?حامل\s+الثلاثي",
+        r"anticodon"
+    ],
+    "initiation": [
+        r"(?:ال)?انطلاق",
+        r"initiation",
+        r"انطلق"
+    ],
+    "elongation": [
+        r"(?:ال)?استطاله",
+        r"elongation",
+        r"استطيل"
+    ],
+    "terminaison": [
+        r"(?:ال)?نهايه",
+        r"terminaison",
+        r"نتهي"
+    ],
+    "uracile_radioactif": [
+        r"(?:ال)?يوراسيل",
+        r"uracile",
+        r"مشع"
+    ],
+    "arnm_synthesis": [
+        r"تركيب",
+        r"تصنيع",
+        r"نسخ",
+        r"synthesis",
+        r"transcription"
+    ],
+    "hemo_rabbit": [
+        r"هيموغلوبين",
+        r"ارنب",
+        r"hemoglobine"
+    ],
+    "arnm_transmission": [
+        r"نقل.*معلومات",
+        r"حمل.*معلومات",
+        r"transmission",
+        r"transfert"
+    ],
+    "universalite": [
+        r"عالميه",
+        r"بصرف\s+النظر",
+        r"universalite"
     ]
 }
 
@@ -271,17 +610,56 @@ def compute_coverage_score(
     if not points_cles or not reponse_eleve.strip():
         return 0.0
     
-    model = get_model()
-    emb_eleve = model.encode(reponse_eleve, normalize_embeddings=True)
+    emb_eleve = embedder.encode([reponse_eleve], normalize_embeddings=True)[0]
     
     covered = 0
     for point in points_cles:
-        emb_point = model.encode(point, normalize_embeddings=True)
+        emb_point = embedder.encode([point], normalize_embeddings=True)[0]
         sim = float(np.dot(emb_eleve, emb_point))
         if sim >= 0.60:
             covered += 1
     
     return covered / len(points_cles)
+
+
+# ── Common Mistakes (Erreurs fréquentes) ──────────────────
+
+async def check_common_mistakes(
+    student_answer: str,
+    chapter_id: str,
+    db
+) -> Optional[dict]:
+    import re
+
+    mistakes = await db.execute(
+        text("""
+            SELECT error_pattern, feedback_ar, error_type, feynman_prompt
+            FROM common_mistakes
+            WHERE chapitre_id = :cid
+            ORDER BY frequency DESC
+            LIMIT 10
+        """),
+        {"cid": chapter_id}
+    )
+    rows = mistakes.fetchall()
+
+    for row in rows:
+        pattern = row[0]
+        try:
+            if re.search(pattern, student_answer, re.IGNORECASE):
+                return {
+                    "source"        : "common_mistakes",
+                    "statut"        : "RETRY",
+                    "score"         : 2,
+                    "feedback"      : row[1],
+                    "error_type"    : row[2],
+                    "feynman_prompt": row[3],
+                    "needs_l1_review": False
+                }
+        except re.error:
+            continue
+
+    return None
 
 
 # ── Évaluateur composite ──────────────────────────────────

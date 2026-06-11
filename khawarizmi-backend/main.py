@@ -98,11 +98,12 @@ class Settings(BaseSettings):
     # ── Chargily Pay ──────────────────────────────────────
     chargily_secret_key: str = "test_sk_fake"
 
-    # ── CORS ──────────────────────────────────────────────
     allowed_origins: List[str] = [
         "http://localhost:3000",
         "http://localhost:5500",
+        "http://127.0.0.1:5500",
         "https://khawarizmi-ia.vercel.app",
+        "https://khawarizmi.vercel.app",
         "https://ia-khawarizmi.dz",
     ]
 
@@ -166,7 +167,7 @@ async def lifespan(app: FastAPI):
 
     if not data_dir:
         parent = Path(__file__).parent.parent.resolve()
-        if (parent / "programme_maths_3as.json").exists():
+        if (parent / "programme_sciences_3as.json").exists():
             data_dir = str(parent)
         elif (Path(__file__).parent / "data").exists():
             data_dir = str(Path(__file__).parent / "data")
@@ -302,9 +303,13 @@ app = FastAPI(
 
 # ── CORS ────────────────────────────────────────────────────────
 cfg_for_cors = get_settings()
+origins = cfg_for_cors.allowed_origins + [
+    "https://khawarizmi-ia.vercel.app",
+    "https://khawarizmi.vercel.app",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = cfg_for_cors.allowed_origins,
+    allow_origins     = origins,
     allow_credentials = True,
     allow_methods     = ["GET", "POST", "PUT", "DELETE"],
     allow_headers     = ["*"],
@@ -817,14 +822,21 @@ async def chat_socratique(
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": body.message},
             ],
-            response_format = {"type": "json_object"},
             temperature     = cfg.ia_temperature,
             max_tokens      = cfg.ia_max_tokens,
             timeout         = 30.0,
         )
 
-        raw_content  = response.choices[0].message.content
+        raw_content  = response.choices[0].message.content or ""
         tokens_used  = response.usage.total_tokens
+        
+        # Clean markdown code fences if present
+        raw_content = raw_content.strip()
+        if raw_content.startswith("```"):
+            lines = raw_content.splitlines()
+            if len(lines) >= 2 and lines[0].startswith("```") and lines[-1].startswith("```"):
+                raw_content = "\n".join(lines[1:-1]).strip()
+                
         ia_result    = json.loads(raw_content)
 
     except json.JSONDecodeError:
@@ -1139,11 +1151,6 @@ async def get_chapitres(
             for ch in chapitres
         ],
     }
-@app.get("/health", tags=["System"])
-async def health():
-    return {"status": "healthy"}
-
-
 # ═══════════════════════════════════════════════════════════════
 # EVALUATE, SESSION & PAYMENT
 # ═══════════════════════════════════════════════════════════════

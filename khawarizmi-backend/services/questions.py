@@ -1,11 +1,16 @@
 import json
 import logging
 import os
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 logger = logging.getLogger("khawarizmi.questions")
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'annales_sciences_3as.json')
+# Résolution du chemin du fichier de questions
+# 1. Variable d'environnement DATA_DIR (Docker / production)
+# 2. Fallback : chemin relatif (développement local)
+_data_dir = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), '..', '..'))
+DATA_PATH = os.path.join(_data_dir, 'annales_sciences_3as.json')
+
 questions_db: Dict[str, Any] = {}
 
 try:
@@ -15,12 +20,19 @@ try:
             for exercice in sujet.get('exercices', []):
                 for q in exercice.get('questions', []):
                     questions_db[q['question_id']] = q
-    logger.info(f"✅ {len(questions_db)} questions charges en mmoire.")
+    logger.info(f"✅ {len(questions_db)} questions chargées en mémoire depuis {DATA_PATH}")
 except Exception as e:
-    logger.error(f"❌ Erreur lors du chargement des questions: {e}")
+    logger.error(f"❌ Erreur lors du chargement des questions ({DATA_PATH}): {e}")
 
 def get_question(question_id: str) -> Dict[str, Any]:
-    return questions_db.get(question_id, None)
+    q = questions_db.get(question_id, None)
+    if q:
+        # Garantir les champs bilingues (texte_ar initial = texte si pas encore traduit)
+        if 'texte_ar' not in q:
+            q['texte_ar'] = q.get('texte', '')
+        if 'concept_cle_ar' not in q:
+            q['concept_cle_ar'] = q.get('concept_cle', '')
+    return q
 
-def get_all_question_ids() -> list:
+def get_all_question_ids() -> List[str]:
     return list(questions_db.keys())

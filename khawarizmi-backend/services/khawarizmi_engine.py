@@ -90,8 +90,8 @@ class KhawarizmiTutor:
 
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
-        self.programme_maths    = self._charger_json(data_dir, 'programme_maths_3as.json')
-        self.annales_maths      = self._charger_json(data_dir, 'annales_maths_3as.json')
+        self.programme_maths    = self._charger_json(data_dir, 'programme_maths_3as.json', optional=True)
+        self.annales_maths      = self._charger_json(data_dir, 'annales_maths_3as.json', optional=True)
         self.programme_physique = self._charger_json(data_dir, 'programme_physique_3as.json', optional=True)
         self.programme_sciences = self._charger_json(data_dir, 'programme_sciences_3as.json', optional=True)
         self.annales_sciences   = self._charger_json(data_dir, 'annales_sciences_3as.json', optional=True)
@@ -500,7 +500,6 @@ Type d'erreur : {type_erreur}
 
 ━━━ RÈGLES ━━━
 → Tu ne dois JAMAIS inventer de faits, de dates, ou de formules.
-→ Si la réponse n'est pas dans le texte fourni, tu dois répondre : 'Cette information n'est pas dans le programme officiel actuel.'
 → Ne révèle JAMAIS la solution officielle
 → Commence par ce qui est CORRECT dans la réponse de l'élève
 → Pose UNE seule question (pas plusieurs)

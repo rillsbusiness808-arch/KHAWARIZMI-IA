@@ -26,6 +26,7 @@ class EvaluateRequest(BaseModel):
     question_id: str
     reponse_eleve: str
     tentative: int = 1
+    lang: str = "fr"
 
 class EvaluateResponse(BaseModel):
     score: int
@@ -34,6 +35,46 @@ class EvaluateResponse(BaseModel):
     manquant: List[str]
     next_review_date: Optional[str] = None
     source: str
+
+# ═══════════════════════════════
+# ENDPOINT PRINCIPAL
+# ═══════════════════════════════
+
+# ═══════════════════════════════════════════════
+# HELPER : Cohérence score/statut
+# ═══════════════════════════════════════════════
+
+_MANDATORY_CONCEPTS = [
+    "ARN polymerase", "polimerase", "بوليميراز",
+    "brin transcrit", "الخيط المنقول", "القالب",
+    "liaison peptidique", "الرابطة الببتيدية",
+    "replication", "تضاعف",
+    "mitose", "انقسام خيطي",
+]
+
+def _is_mandatory(concept: str) -> bool:
+    c = concept.lower().strip()
+    return any(m.lower() in c for m in _MANDATORY_CONCEPTS)
+
+def normalize_result(result: dict) -> dict:
+    """
+    Garantit la cohérence entre score, statut et manquants.
+    Un CORRECT avec des concepts obligatoires manquants → PARTIEL.
+    """
+    manquant = result.get("manquant", [])
+    mandatory_missing = [m for m in manquant if _is_mandatory(m)]
+
+    if mandatory_missing and result.get("statut") == "CORRECT":
+        result["statut"] = "PARTIEL"
+        result["score"] = min(result.get("score", 10), 6)
+        result["feedback"] = result.get("feedback", "").replace("Excellent", "Bien")
+
+    # Score 0 doit être FAUX
+    if result.get("score", 0) == 0 and result.get("statut") != "FAUX":
+        result["statut"] = "FAUX"
+
+    # RETRY (common_mistakes) reste inchangé
+    return result
 
 # ═══════════════════════════════
 # ENDPOINT PRINCIPAL
@@ -228,6 +269,14 @@ async def evaluate(
             f"q={req.question_id} | source={eval_result['source']}"
         )
 
+    # Normaliser la cohérence score/statut/manquant
+    eval_result = normalize_result(eval_result)
+
+    # Traduire le feedback si la langue est arabe
+    if req.lang == "ar":
+        from services.feedback_translator import translate_feedback
+        eval_result["feedback"] = translate_feedback(eval_result.get("feedback", ""))
+
     return EvaluateResponse(
         score            = eval_result["score"],
         statut           = eval_result["statut"],
@@ -243,6 +292,18 @@ async def evaluate(
 
 async def evaluate_with_fallback(question: dict, req: EvaluateRequest, openai_client, user_id: str, db: AsyncSession) -> dict:
     
+    # NIVEAU 0 — Common Mistakes (gratuit, instantané, pas de LLM)
+    try:
+        from services.fallback_v2 import check_common_mistakes
+        chapter_id = question.get("chapitre_id", question.get("chapitre", "ch1_proteines"))
+        instant = await check_common_mistakes(req.reponse_eleve, chapter_id, db)
+        if instant:
+            instant["source"] = "COMMON_MISTAKES"
+            logger.info(f"COMMON_MISTAKE | user={user_id} | q={req.question_id} | type={instant.get('error_type')}")
+            return instant
+    except Exception as e:
+        logger.warning(f"COMMON_MISTAKES_SKIP | user={user_id} | reason={str(e)}")
+
     # NIVEAU 1 — GPT-4o avec retry
     try:
         result = await call_gpt4o_evaluator(

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from openai import AsyncOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -84,6 +85,46 @@ CRITICAL ERRORS (always -> global_score < 0.20):
 - Any reversal of cause/effect in a biological mechanism
 
 ═══════════════════════════════════════════════
+SPECIFIC EVALUATION RULES — CHAPITRE 1: SYNTHÈSE DES PROTÉINES
+═══════════════════════════════════════════════
+RÈGLE 1 — MÉTHODE ONEC (OBLIGATOIRE pour questions sur expériences)
+  Structure attendue : Description → Résultats chiffrés → Déduction
+  Pénalité si absent : -2 points sur la note méthodologie
+  Détecter : présence de "الوثيقة تبين" ou "يتضح من" avant la déduction
+
+RÈGLE 2 — TRANSCRIPTION
+  Terme obligatoire : ARN polymérase.
+  Note : L'hélicase n'est pas au programme pour la transcription (ne pas exiger sa mention ni pénaliser son absence).
+  Sens de lecture ADN : 3'→5' (brin transcrit / السلسلة المستنسخة)
+  Sens synthèse ARNm : 5'→3'
+  Substitution nucléotidique : T→U (pas T→T)
+
+RÈGLE 3 — TRADUCTION
+  Activation AA : enzyme (أمينو أسيل ARNt سينتيتار / aminoacyl-ARNt synthétase) + ATP
+  Sites ribosome : site A (site aminoacyl) + site P (site peptidyl)
+  Liaison peptidique (الرابطة الببتيدية) : ne pas exiger la mention de la perte de H2O (la considérer comme bonus si présente).
+  Sens translocation / انزلاق : vers extrémité 3' de l'ARNm. Le terme officiel du livre est "انزلاق الريبوزوم" (glissement du ribosome) et a la même valeur que "translocation".
+  Modèle de ribosome : Le livre utilise le modèle bactérien 70S (ne pas pénaliser la mention de 70S même pour les eucaryotes).
+  Méthionine initiatrice : libérée à la fin de la traduction (considérer comme bonus si mentionnée).
+
+RÈGLE 4 — CODE GÉNÉTIQUE
+  AUG = codon initiateur = méthionine (toujours)
+  UAA, UAG, UGA = codons stop (ne codent pour aucun AA)
+  Propriétés : universel, dégénéré, non chevauchant, sans virgule
+
+RÈGLE 5 — ÉPISSAGE (EUCARYOTES UNIQUEMENT)
+  ARNm pré-messager (ARNm الأولي) → élimination introns (القطع غير الدالة) → soudure exons (القطع الدالة) → ARNm mature (ARNm ناضج)
+  Ne s'applique PAS aux procaryotes
+
+RÈGLE 6 — LIMITES DU PROGRAMME (NE JAMAIS PÉNALISER LEUR ABSENCE)
+  Les concepts suivants sont absents du manuel scolaire officiel :
+  - Hélicase
+  - Libération de H2O lors de la liaison peptidique
+  - Coiffe 5'-CAP et queue poly-A
+  - Comparaison 70S vs 80S (seul le ribosome 70S est décrit)
+  Ces concepts ne doivent pas être exigés, mais peuvent être acceptés comme BONUS.
+
+═══════════════════════════════════════════════
 SYNONYM TABLE — ACCEPTED EQUIVALENCES
 ═══════════════════════════════════════════════
 Accept these as valid equivalents:
@@ -122,6 +163,58 @@ FEEDBACK LANGUAGE:
 - Provide BOTH feedback_fr and feedback_ar.
 """
 
+def extract_json_from_gemini(raw_text: str) -> dict:
+    """
+    Gemini 2.5 Flash retourne parfois :
+    - Du JSON pur
+    - ```json {...} ```
+    - Du texte + JSON mélangés
+    - Du JSON tronqué (bug connu)
+    """
+    if not raw_text or not raw_text.strip():
+        return {}
+
+    text = raw_text.strip()
+
+    # Étape 1 : Nettoyer les backticks Markdown
+    text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
+    text = text.strip()
+
+    # Étape 2 : Essai parsing direct
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Étape 3 : Extraire le premier objet JSON valide
+    brace_start = text.find('{')
+    if brace_start != -1:
+        # Chercher la fermeture correcte
+        depth = 0
+        for i, char in enumerate(text[brace_start:], start=brace_start):
+            if char == '{': depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[brace_start:i+1])
+                    except json.JSONDecodeError:
+                        break
+
+    # Étape 4 : JSON tronqué — tenter la réparation
+    # Compter les accolades ouvertes non fermées
+    open_braces = text.count('{') - text.count('}')
+    open_brackets = text.count('[') - text.count(']')
+    repaired = text + (']' * max(0, open_brackets)) + ('}' * max(0, open_braces))
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+
+    return {}
+
+
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=4)
@@ -148,24 +241,56 @@ REPONSE_ELEVE: {reponse}"""
 
     # Timeout de 8 secondes passé directement à l'appel réseau
     _model = os.getenv("OPENAI_MODEL", "gpt-4o")
-    response = await client.chat.completions.create(
-        model           = _model,
-        temperature     = 0,
-        seed            = 42,
-        max_tokens      = 400,
-        timeout         = 8.0,
-        response_format = {"type": "json_object"},
-        messages        = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": user_message}
-        ]
-    )
+    
+    try:
+        response = await client.chat.completions.create(
+            model           = _model,
+            temperature     = 0,
+            seed            = 42,
+            max_tokens      = 400,
+            timeout         = 8.0,
+            messages        = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": user_message}
+            ]
+        )
+    except Exception as e:
+        # Si c'est une erreur de quota / rate limit (429), on tente le fallback immédiat vers OpenAI gpt-4o-mini
+        if "429" in str(e) or "quota" in str(e).lower():
+            logger.warning("⚠️ Quota atteint ou 429 sur le client principal. Tentative de fallback OpenAI...")
+            fallback_key = os.getenv("OPENAI_FALLBACK_API_KEY") or os.getenv("REAL_OPENAI_API_KEY")
+            if fallback_key:
+                try:
+                    fallback_client = AsyncOpenAI(
+                        api_key=fallback_key,
+                        base_url="https://api.openai.com/v1"
+                    )
+                    response = await fallback_client.chat.completions.create(
+                        model           = "gpt-4o-mini",
+                        temperature     = 0,
+                        seed            = 42,
+                        max_tokens      = 400,
+                        timeout         = 8.0,
+                        messages        = [
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user",   "content": user_message}
+                        ]
+                    )
+                    logger.info("✅ Fallback OpenAI (gpt-4o-mini) réussi.")
+                except Exception as fallback_err:
+                    logger.error(f"❌ Échec du fallback OpenAI : {fallback_err}")
+                    raise e
+            else:
+                logger.warning("⚠️ Aucune clé API de fallback (OPENAI_FALLBACK_API_KEY) configurée.")
+                raise e
+        else:
+            raise e
 
-    content = response.choices[0].message.content
-    if not content:
-        raise ValueError("Empty response from OpenAI")
-
-    result = json.loads(content)
+    content = response.choices[0].message.content or ""
+    result = extract_json_from_gemini(content)
+    
+    if not result:
+        raise ValueError(f"Échec de l'extraction JSON de la réponse : {repr(content)}")
 
     # Validation et mapping pour compatibilité avec l'ancienne structure de retour
     global_score = float(result.get("global_score", 0.0))

@@ -316,17 +316,21 @@ def get_allowed_origins() -> List[str]:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = get_allowed_origins(),
-    allow_credentials = True,
-    allow_methods     = ["GET", "POST", "PUT", "DELETE"],
-    allow_headers     = ["*"],
+    allow_origins       = get_allowed_origins(),
+    allow_origin_regex  = r"https://.*\.vercel\.app",
+    allow_credentials   = True,
+    allow_methods       = ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers       = ["*"],
 )
 
 # ── Trusted Hosts (production) ───────────────────────────────────
 if os.getenv("ENVIRONMENT") == "production":
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts = ["ia-khawarizmi.dz", "*.ia-khawarizmi.dz"],
+        allowed_hosts = [
+            "ia-khawarizmi.dz", "*.ia-khawarizmi.dz",
+            "*.up.railway.app",
+        ],
     )
 
 

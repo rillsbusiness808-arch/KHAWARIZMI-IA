@@ -264,9 +264,8 @@ function _showNextFromQueue() {
 }
 
 async function loadNextQuestion() {
-    _errorRetryCount = 0;
-
     if (_sessionQueue.length > 0) {
+        _errorRetryCount = 0;
         console.log(`Queue locale: ${_sessionQueue.length} restantes`);
         _showNextFromQueue();
         return;
@@ -312,6 +311,7 @@ async function loadNextQuestion() {
         }
 
         _sessionQueue = queue;
+        _errorRetryCount = 0;
         console.log('_sessionQueue initialisee avec', _sessionQueue.length, 'cartes');
         _showNextFromQueue();
 
@@ -699,3 +699,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Exposer pour render()
     window.updateSessionProgress = updateSessionProgress;
 });
+
+// ═══════════════════════════════════════════════
+// ZOOM SCHÉMAS SVT
+// ═══════════════════════════════════════════════
+
+function initSchemaZoom() {
+    document.querySelectorAll('.schema-svt').forEach(img => {
+        img.addEventListener('click', () => {
+            const overlay = document.createElement('div');
+            overlay.className = 'schema-overlay';
+            overlay.innerHTML = `
+                <div class="schema-zoom-container">
+                    <img src="${img.src}" alt="${img.alt}">
+                    <button class="schema-close">✕</button>
+                </div>
+            `;
+            overlay.querySelector('.schema-close')
+                .addEventListener('click', () => overlay.remove());
+            overlay.addEventListener('click', e => {
+                if (e.target === overlay) overlay.remove();
+            });
+            document.body.appendChild(overlay);
+        });
+        img.style.cursor = 'zoom-in';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initSchemaZoom);

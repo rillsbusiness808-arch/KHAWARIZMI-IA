@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from main import get_db, get_settings, state
+from deps import get_db, get_settings, _get_state as get_state
 
 logger = logging.getLogger("khawarizmi.payment")
 router = APIRouter(prefix="/api/payment", tags=["Paiement"])
@@ -41,11 +41,11 @@ async def activate_premium(checkout_id: str):
     """
     Active le statut premium ('pro') pour l'utilisateur associé au checkout_id.
     """
-    if not state.db_session:
+    if not get_state().db_session:
         logger.error("Impossible d'activer le premium: db_session non configurée.")
         return
         
-    async with state.db_session() as session:
+    async with get_state().db_session() as session:
         try:
             result = await session.execute(
                 text("SELECT user_id FROM payments WHERE checkout_id = :cid"),
@@ -176,12 +176,12 @@ async def reconcile_pending_payments():
     Réconcilie les paiements 'pending' bloqués suite à des micro-coupures de connexion.
     Recommandé pour être exécuté par un cron toutes les 30 minutes.
     """
-    if not state.db_session:
+    if not get_state().db_session:
         return
         
     logger.info("Début du job de réconciliation des paiements...")
     
-    async with state.db_session() as session:
+    async with get_state().db_session() as session:
         try:
             # Récupérer les paiements en attente de plus de 10 minutes (et moins de 24h)
             pending = await session.execute(

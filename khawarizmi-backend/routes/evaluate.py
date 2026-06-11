@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from typing import Dict, Any, Optional, List
 
-from main import get_current_user, get_db, get_openai, get_scheduler
+from deps import get_current_user, get_db, get_openai, get_scheduler
 from services.llm import call_gpt4o_evaluator
 from services.fallback import fallback_safe_json
 from services.fallback_v2 import evaluate_l2

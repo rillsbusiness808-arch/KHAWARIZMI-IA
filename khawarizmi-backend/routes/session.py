@@ -6,7 +6,7 @@ from sqlalchemy import text
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
-from main import get_current_user, get_db
+from deps import get_current_user, get_db
 from services.questions import get_question, get_all_question_ids
 
 logger = logging.getLogger("khawarizmi.session")

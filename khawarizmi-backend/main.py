@@ -326,7 +326,12 @@ app.add_middleware(
 if os.getenv("ENVIRONMENT") == "production":
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts = ["ia-khawarizmi.dz", "*.ia-khawarizmi.dz"],
+        allowed_hosts = [
+            "ia-khawarizmi.dz",
+            "*.ia-khawarizmi.dz",
+            "healthcheck.railway.app",
+            "*.up.railway.app",
+        ],
     )
 
 

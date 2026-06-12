@@ -258,46 +258,61 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/auth-supabase.js"></script>
 <script src="js/wilayas.js"></script>
 <script>
   async function init() {
-    if (!await requireAuth()) return;
+    // Try Supabase first, fallback localStorage
+    if (supabaseAvailable) {
+      if (!await requireAuth()) return;
+      const profile = await getCurrentProfile();
+      if (!profile) { window.location.href = 'connexion.html'; return; }
 
-    const profile = await getCurrentProfile();
-    if (!profile) {
-      window.location.href = 'connexion.html';
-      return;
-    }
-
-    const initials = (profile.first_name[0] + (profile.last_name[0] || '')).toUpperCase();
-    document.getElementById('userAvatar').textContent = initials;
-    document.getElementById('userName').textContent = `${profile.first_name} ${profile.last_name}`;
-    document.getElementById('userEmail').textContent = profile.email;
-
-    document.getElementById('infoEmail').textContent = profile.email;
-    document.getElementById('infoPhone').textContent = profile.phone || 'غير محدد';
-    document.getElementById('infoWilaya').textContent = getWilayaName(profile.wilaya);
-
-    if (profile.birthdate) {
-      const bd = new Date(profile.birthdate);
-      document.getElementById('infoBirthdate').textContent = bd.toLocaleDateString('ar-DZ');
+      const initials = (profile.first_name[0] + (profile.last_name[0] || '')).toUpperCase();
+      document.getElementById('userAvatar').textContent = initials;
+      document.getElementById('userName').textContent = `${profile.first_name} ${profile.last_name}`;
+      document.getElementById('userEmail').textContent = profile.email;
+      document.getElementById('infoEmail').textContent = profile.email;
+      document.getElementById('infoPhone').textContent = profile.phone || 'غير محدد';
+      document.getElementById('infoWilaya').textContent = getWilayaName(profile.wilaya);
+      if (profile.birthdate) {
+        document.getElementById('infoBirthdate').textContent = new Date(profile.birthdate).toLocaleDateString('ar-DZ');
+      } else {
+        document.getElementById('infoBirthdate').textContent = 'غير محدد';
+      }
+      const levels = { '3as': '🎓 السنة الثالثة ثانوي', '2as': '📚 السنة الثانية ثانوي', '1as': '📖 السنة الأولى ثانوي', 'teacher': '👨‍🏫 أستاذ/معلم', 'parent': '👨‍👩‍👧 ولي أمر', 'other': '🔍 أخرى' };
+      document.getElementById('infoLevel').textContent = levels[profile.level] || profile.level || 'غير محدد';
+      document.getElementById('infoTelegram').textContent = profile.telegram || 'غير محدد';
+      const stats = profile.stats || {};
+      document.getElementById('chaptersRead').textContent = stats.chaptersRead || 0;
+      document.getElementById('quizCompleted').textContent = stats.quizCompleted || 0;
+      document.getElementById('timeSpent').textContent = Math.round((stats.timeSpent || 0) / 60) + 'h';
     } else {
-      document.getElementById('infoBirthdate').textContent = 'غير محدد';
+      // Fallback localStorage
+      const user = Auth.getCurrentUser();
+      if (!user) { window.location.href = 'connexion.html'; return; }
+
+      const initials = (user.firstName[0] + user.lastName[0]).toUpperCase();
+      document.getElementById('userAvatar').textContent = initials;
+      document.getElementById('userName').textContent = `${user.firstName} ${user.lastName}`;
+      document.getElementById('userEmail').textContent = user.email;
+      document.getElementById('infoEmail').textContent = user.email;
+      document.getElementById('infoPhone').textContent = user.phone || 'غير محدد';
+      document.getElementById('infoWilaya').textContent = getWilayaName(user.wilaya);
+      if (user.birthdate) {
+        document.getElementById('infoBirthdate').textContent = new Date(user.birthdate).toLocaleDateString('ar-DZ');
+      } else {
+        document.getElementById('infoBirthdate').textContent = 'غير محدد';
+      }
+      const levels = { '3as': '🎓 السنة الثالثة ثانوي', '2as': '📚 السنة الثانية ثانوي', '1as': '📖 السنة الأولى ثانوي', 'teacher': '👨‍🏫 أستاذ/معلم', 'parent': '👨‍👩‍👧 ولي أمر', 'other': '🔍 أخرى' };
+      document.getElementById('infoLevel').textContent = levels[user.level] || user.level || 'غير محدد';
+      document.getElementById('infoTelegram').textContent = user.telegram || 'غير محدد';
+      const stats = user.stats || {};
+      document.getElementById('chaptersRead').textContent = stats.chaptersRead || 0;
+      document.getElementById('quizCompleted').textContent = stats.quizCompleted || 0;
+      document.getElementById('timeSpent').textContent = Math.round((stats.timeSpent || 0) / 60) + 'h';
     }
-
-    const levels = {
-      '3as': '🎓 السنة الثالثة ثانوي', '2as': '📚 السنة الثانية ثانوي',
-      '1as': '📖 السنة الأولى ثانوي', 'teacher': '👨‍🏫 أستاذ/معلم',
-      'parent': '👨‍👩‍👧 ولي أمر', 'other': '🔍 أخرى'
-    };
-    document.getElementById('infoLevel').textContent = levels[profile.level] || profile.level || 'غير محدد';
-    document.getElementById('infoTelegram').textContent = profile.telegram || 'غير محدد';
-
-    const stats = profile.stats || {};
-    document.getElementById('chaptersRead').textContent = stats.chaptersRead || 0;
-    document.getElementById('quizCompleted').textContent = stats.quizCompleted || 0;
-    document.getElementById('timeSpent').textContent = Math.round((stats.timeSpent || 0) / 60) + 'h';
   }
 
   function logout() {

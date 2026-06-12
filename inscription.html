@@ -341,6 +341,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/auth-supabase.js"></script>
 <script src="js/wilayas.js"></script>
 <script>
@@ -496,7 +497,9 @@
     if (result.success) {
       showMessage('success', '✅ ' + result.message);
       document.getElementById('registerForm').reset();
-      setTimeout(() => { window.location.href = 'verifier-email.html'; }, 2000);
+      setTimeout(() => {
+        window.location.href = supabaseAvailable ? 'verifier-email.html' : 'mon-compte.html';
+      }, 2000);
     } else {
       showMessage('error', result.error);
       submitBtn.classList.remove('loading');

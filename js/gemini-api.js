@@ -1,14 +1,14 @@
 /* ============================================
-   GEMINI API - AI Connection
+   GROQ API - AI Connection (remplace Gemini)
    ============================================ */
 
 const GeminiAPI = {
-  // ⚠️ REMPLACE par ta vraie clé API Gemini (gratuite sur https://makersuite.google.com/app/apikey)
-  API_KEY: 'YOUR_GEMINI_API_KEY_HERE',
-  
-  API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
-  
-  // System prompt pour le contexte Khawarizmi
+  API_KEY: 'VOTRE_CLE_GROQ_ICI', // à remplacer ou à configurer via le backend
+
+  API_URL: 'https://api.groq.com/openai/v1/chat/completions',
+
+  MODEL: 'llama-3.3-70b-versatile',
+
   SYSTEM_PROMPT: `أنت "أستاذ خوارزمي"، مساعد ذكي متخصص في علوم الطبيعة والحياة لطلاب البكالوريا في الجزائر.
 
 قواعد مهمة:
@@ -22,91 +22,65 @@ const GeminiAPI = {
 8. إذا لم تعرف الإجابة، قل ذلك بصراحة ولا تخترع معلومات
 
 كن دائماً مهنياً، مفيداً ومحفزاً!`,
-  
+
   async sendMessage(userMessage, conversationHistory = []) {
     try {
-      // Clean history to match expected API format
       const messages = [
-        {
-          role: 'user',
-          parts: [{ text: this.SYSTEM_PROMPT }]
-        },
-        {
-          role: 'model',
-          parts: [{ text: 'فهمت! أنا أستاذ خوارزمي، جاهز لمساعدة طلاب البكالوريا الجزائريين. كيف يمكنني مساعدتك اليوم؟' }]
-        }
+        { role: 'system', content: this.SYSTEM_PROMPT },
+        { role: 'assistant', content: 'فهمت! أنا أستاذ خوارزمي، جاهز لمساعدة طلاب البكالوريا الجزائريين. كيف يمكنني مساعدتك اليوم؟' }
       ];
 
-      // Format conversation history correctly
       conversationHistory.forEach(msg => {
         messages.push({
-          role: msg.role,
-          parts: [{ text: msg.parts[0].text }]
+          role: msg.role === 'model' ? 'assistant' : 'user',
+          content: msg.parts[0].text
         });
       });
 
-      // Add the current user message
-      messages.push({
-        role: 'user',
-        parts: [{ text: userMessage }]
-      });
-      
-      const response = await fetch(`${this.API_URL}?key=${this.API_KEY}`, {
+      messages.push({ role: 'user', content: userMessage });
+
+      const response = await fetch(this.API_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.API_KEY}`
         },
         body: JSON.stringify({
-          contents: messages,
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024
-          },
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
-          ]
+          model: this.MODEL,
+          messages: messages,
+          temperature: 0.7,
+          max_tokens: 1024,
+          top_p: 0.95
         })
       });
-      
+
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+        const errBody = await response.text().catch(() => '');
+        throw new Error(`API ${response.status}: ${errBody.slice(0, 200)}`);
       }
-      
+
       const data = await response.json();
-      
-      if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+
+      if (data.choices && data.choices[0]?.message?.content) {
         return {
           success: true,
-          message: data.candidates[0].content.parts[0].text
+          message: data.choices[0].message.content
         };
       } else {
-        throw new Error('Réponse invalide de Gemini');
+        throw new Error('Réponse invalide de Groq');
       }
-      
+
     } catch (error) {
-      console.error('Gemini API Error:', error);
-      
-      // Fallback : Réponse simulée si pas de clé API
-      if (!this.API_KEY || this.API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
-        return this.getFallbackResponse(userMessage);
-      }
-      
-      return {
-        success: false,
-        message: 'عذراً، حدث خطأ. يرجى المحاولة مرة أخرى. 🙏'
-      };
+      console.error('Groq API Error:', error);
+      return this.getFallbackResponse(userMessage);
     }
   },
-  
-  // Réponses simulées si pas de clé API (mode demo)
+
   getFallbackResponse(userMessage) {
     const lowerMsg = userMessage.toLowerCase();
-    
+
     let response = '';
-    
+
     if (lowerMsg.includes('استنساخ') || lowerMsg.includes('transcription')) {
       response = `📚 **عملية الاستنساخ (Transcription)**\n\nهي عملية نسخ المعلومة الوراثية من ADN إلى ARNm داخل النواة.\n\n**المراحل:**\n1️⃣ الانطلاق: ارتباط ARN بوليمراز\n2️⃣ الاستطالة: قراءة وبناء ARN\n3️⃣ النهاية: انفصال الإنزيم\n\n💡 نصيحة: راجع جيداً دور إنزيم ARN polymérase لأنه سؤال متكرر في البكالوريا!`;
     } else if (lowerMsg.includes('ترجمة') || lowerMsg.includes('translation')) {
@@ -118,9 +92,9 @@ const GeminiAPI = {
     } else if (lowerMsg.includes('اختبار') || lowerMsg.includes('سؤال') || lowerMsg.includes('quiz')) {
       response = `🧪 **سؤال للاختبار:**\n\nما هي مراحل عملية الاستنساخ؟ وما هو دور إنزيم ARN بوليمراز في كل مرحلة؟\n\n💭 خذ وقتك للتفكير، ثم أرسل لي إجابتك وسأقوم بتصحيحها!`;
     } else {
-      response = `شكراً على سؤالك! 🌟\n\n*ملاحظة: أنا حالياً في وضع تجريبي. للاستفادة الكاملة من قدراتي، يجب إضافة مفتاح API Gemini.*\n\nيمكنك سؤالي عن:\n• تركيب البروتين 🧬\n• الشفرة الوراثية 🔤\n• الترجمة 🔄\n• المناعة 🛡️\n• وأي موضوع من برنامج البكالوريا!`;
+      response = `شكراً على سؤالك! 🌟\n\nيمكنني مساعدتك في:\n• تركيب البروتين 🧬\n• الشفرة الوراثية 🔤\n• الترجمة 🔄\n• المناعة 🛡️\n• وأي موضوع من برنامج البكالوريا!`;
     }
-    
+
     return {
       success: true,
       message: response,

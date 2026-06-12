@@ -96,14 +96,15 @@ body::after {
 }
 
 .auth-logo {
-  font-family: 'Cairo', sans-serif;
-  font-size: 1.6rem;
-  font-weight: 800;
-  color: #C9A961;
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 40px;
+}
+
+.auth-logo img {
+  height: 48px;
+  width: auto;
 }
 
 .auth-logo-icon {

@@ -5,7 +5,7 @@
 const Chatbot = {
   // Configuration
   config: {
-    freeLimit: 5,
+    freeLimit: 999999,
     isPremium: false
   },
   

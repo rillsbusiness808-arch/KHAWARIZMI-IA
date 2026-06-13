@@ -408,14 +408,16 @@ app.add_middleware(
 )
 
 # ── Trusted Hosts (production) ───────────────────────────────────
-if os.getenv("ENVIRONMENT") == "production":
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts = [
-            "ia-khawarizmi.dz", "*.ia-khawarizmi.dz",
-            "*.up.railway.app",
-        ],
-    )
+# Railway assure déjà la validation Host au niveau du proxy,
+# cette vérification côté app est redondante et bloque les health checks internes.
+# if os.getenv("ENVIRONMENT") == "production":
+#     app.add_middleware(
+#         TrustedHostMiddleware,
+#         allowed_hosts = [
+#             "ia-khawarizmi.dz", "*.ia-khawarizmi.dz",
+#             "*.up.railway.app",
+#         ],
+#     )
 
 
 # ═══════════════════════════════════════════════════════════════

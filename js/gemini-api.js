@@ -1,13 +1,11 @@
 /* ============================================
-   GROQ API - AI Connection (remplace Gemini)
+   OPENROUTER API - AI Connection
    ============================================ */
 
 const GeminiAPI = {
-  API_KEY: 'VOTRE_CLE_GROQ_ICI',
+  API_URL: '/api/chat',
 
-  API_URL: 'https://api.groq.com/openai/v1/chat/completions',
-
-  MODEL: 'llama-3.3-70b-versatile',
+  MODEL: 'meta-llama/llama-3.3-70b-instruct',
 
   explanationAttempts: {},
 
@@ -77,10 +75,7 @@ const GeminiAPI = {
 
       const response = await fetch(this.API_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.API_KEY}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: this.MODEL,
           messages: messages,
@@ -162,3 +157,5 @@ const GeminiAPI = {
     return { success: true, message: response, isDemo: true };
   }
 };
+
+if (typeof window !== 'undefined') window.GeminiAPI = GeminiAPI;

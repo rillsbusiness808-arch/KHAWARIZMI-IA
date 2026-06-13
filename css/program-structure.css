@@ -89,9 +89,23 @@
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(201, 169, 97, 0.2);
+  border-top: 4px solid #A68845;
   padding: 20px;
   border-radius: 16px;
   transition: var(--transition);
+}
+
+.hero-program-tagline {
+  text-align: center;
+  margin: 0 auto 30px;
+  max-width: 600px;
+  line-height: 1.8;
+  color: rgba(255,255,255,0.85);
+  font-size: 0.95rem;
+}
+.hero-program-tagline em {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.55);
 }
 
 .hero-stat-item:hover {
@@ -739,11 +753,18 @@
   gap: 8px;
   transition: var(--transition);
   box-shadow: 0 8px 24px rgba(201, 169, 97, 0.3);
+  animation: pulse-cta 3s infinite;
 }
 
 .btn-gold:hover {
   transform: translateY(-3px);
   box-shadow: 0 12px 32px rgba(201, 169, 97, 0.4);
+  animation: none;
+}
+
+@keyframes pulse-cta {
+  0%, 100% { box-shadow: 0 8px 24px rgba(201, 169, 97, 0.3); }
+  50% { box-shadow: 0 8px 32px rgba(201, 169, 97, 0.5); }
 }
 
 .btn-outline-gold {

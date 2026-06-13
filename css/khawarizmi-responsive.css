@@ -50,7 +50,7 @@
     text-align: center;
   }
   
-  .nav-menu.active {
+  #navLinks.active {
     display: flex;
   }
   
@@ -64,6 +64,11 @@
   
   .nav-actions {
     gap: 8px;
+  }
+
+  .nav-actions .btn-login {
+    font-size: 0.85rem;
+    padding: 8px 14px;
   }
 }
 

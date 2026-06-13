@@ -2,6 +2,11 @@
    NAVIGATION - Génération Dynamique des Pages
    ============================================ */
 
+function getBacYear() {
+  const now = new Date();
+  return now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear();
+}
+
 const SiteNavigator = {
   
   renderHero() {
@@ -20,7 +25,7 @@ const SiteNavigator = {
           
           <h1 class="hero-program-title">
             ${PROGRAM.meta.title}<br>
-            <span class="highlight">للبكالوريا 2026</span>
+            <span class="highlight">للبكالوريا <span class="bac-year">${getBacYear()}</span></span>
           </h1>
           
           <p class="hero-program-subtitle">
@@ -31,22 +36,27 @@ const SiteNavigator = {
             📚 ${PROGRAM.meta.level}
           </div>
           
+          <p class="hero-program-tagline">
+            🎓 المنصة الذكية الأولى في الجزائر لتحضير البكالوريا<br>
+            <em>La 1ère plateforme IA en Algérie pour réussir le BAC</em>
+          </p>
+          
           <div class="hero-stats">
-            <div class="hero-stat-item">
+            <div class="hero-stat-item" style="border-top-color:#A78BFA;">
               <div class="hero-stat-number">${PROGRAM.meta.totalDomains}</div>
-              <div class="hero-stat-label">مجالات</div>
+              <div class="hero-stat-label">🌐 مجالات</div>
             </div>
-            <div class="hero-stat-item">
+            <div class="hero-stat-item" style="border-top-color:#FB7185;">
               <div class="hero-stat-number">${PROGRAM.meta.totalUnits}</div>
-              <div class="hero-stat-label">وحدات</div>
+              <div class="hero-stat-label">📚 وحدات</div>
             </div>
-            <div class="hero-stat-item">
+            <div class="hero-stat-item" style="border-top-color:#60A5FA;">
               <div class="hero-stat-number">${totalChapters}+</div>
-              <div class="hero-stat-label">فصل</div>
+              <div class="hero-stat-label">📖 فصل</div>
             </div>
-            <div class="hero-stat-item">
+            <div class="hero-stat-item" style="border-top-color:#C9A961;">
               <div class="hero-stat-number">∞</div>
-              <div class="hero-stat-label">مع IA</div>
+              <div class="hero-stat-label">🤖 مع IA</div>
             </div>
           </div>
           

@@ -16,7 +16,8 @@ const Chatbot = {
     todayUsage: 0,
     isProcessing: false,
     currentTopic: null,
-    explanationCount: 0
+    explanationCount: 0,
+    tutorMode: false
   },
 
   // Suggestions initiales
@@ -70,7 +71,7 @@ const Chatbot = {
     toggle.id = 'chatbotToggle';
     toggle.innerHTML = `
       🤖
-      <span class="chatbot-badge">1</span>
+      <span class="chatbot-badge" style="display:none;">1</span>
     `;
     toggle.title = 'تحدث مع أستاذ خوارزمي';
     document.body.appendChild(toggle);
@@ -80,17 +81,23 @@ const Chatbot = {
     window.className = 'chatbot-window';
     window.id = 'chatbotWindow';
     window.innerHTML = `
-      <div class="chatbot-header">
-        <div class="chatbot-avatar">🧠</div>
-        <div class="chatbot-info">
-          <div class="chatbot-name">أستاذ خوارزمي</div>
-          <div class="chatbot-status">
-            <span class="status-dot"></span>
-            متاح الآن
+        <div class="chatbot-header">
+          <div class="chatbot-avatar">
+            <img src="assets/logo.png" alt="خوارزمي IA" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <span class="avatar-fallback">خ</span>
+          </div>
+          <div class="chatbot-info">
+            <div class="chatbot-name">أستاذ خوارزمي</div>
+            <div class="chatbot-status">
+              <span class="status-dot"></span>
+              متاح الآن
+            </div>
+          </div>
+          <div class="chatbot-header-actions">
+            <button class="chatbot-header-btn" id="tutorToggle" title="المدرس الشخصي">🎓</button>
+            <button class="chatbot-close" id="chatbotClose" title="إغلاق">✕</button>
           </div>
         </div>
-        <button class="chatbot-close" id="chatbotClose" title="إغلاق">✕</button>
-      </div>
       
       <div class="chatbot-messages" id="chatbotMessages">
         <div class="welcome-message">
@@ -149,6 +156,7 @@ const Chatbot = {
     toggle.addEventListener('click', () => this.toggleChat());
     close.addEventListener('click', () => this.toggleChat());
     send.addEventListener('click', () => this.sendMessage());
+    document.getElementById('tutorToggle')?.addEventListener('click', () => this.activateTutorMode());
     
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -243,6 +251,10 @@ const Chatbot = {
         this.addMessage(response, 'bot');
         this.state.todayUsage++; this.saveUsage(); this.updateUsageCounter();
         this.addFeedbackButtons();
+        if (typeof LearningStats !== 'undefined') {
+          const topic = this.detectTopic(message) || null;
+          LearningStats.trackQuestion(topic);
+        }
         return;
       }
     }
@@ -253,6 +265,11 @@ const Chatbot = {
     }
     
     // Appel à Groq
+    if (typeof GeminiAPI === 'undefined') {
+      this.addMessage('⚠️ عذراً، وحدة الذكاء الاصطناعي غير متوفرة. حاول تحديث الصفحة.', 'bot');
+      return;
+    }
+
     this.showTyping();
     this.state.isProcessing = true;
     
@@ -276,6 +293,12 @@ const Chatbot = {
       
       this.state.todayUsage++; this.saveUsage(); this.updateUsageCounter();
       this.addFeedbackButtons();
+
+      if (typeof LearningStats !== 'undefined') {
+        const topic = this.detectTopic(message) || null;
+        if (topic) this.state.currentTopic = topic;
+        LearningStats.trackQuestion(topic);
+      }
     } else {
       this.addMessage(response.message, 'bot');
     }
@@ -293,7 +316,7 @@ const Chatbot = {
     
     msgDiv.innerHTML = `
       <div class="message-bubble">${formattedText}</div>
-      <div class="message-time">${time}${isDemo ? ' • Demo' : ''}</div>
+      <div class="message-time">${time}</div>
     `;
     
     messages.appendChild(msgDiv);
@@ -380,30 +403,155 @@ const Chatbot = {
     const last = messages.querySelector('.message.bot:last-child');
     if (!last) return;
     const fb = document.createElement('div');
-    fb.style.cssText = 'display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;';
+    fb.className = 'feedback-container';
     fb.innerHTML = `
-      <button onclick="Chatbot.handleFeedback('understood')" style="background:#10B981;color:white;border:none;padding:5px 12px;border-radius:20px;cursor:pointer;font-family:var(--font-ar);font-size:0.8rem;">✅ فهمت!</button>
-      <button onclick="Chatbot.handleFeedback('confused')" style="background:#DC2626;color:white;border:none;padding:5px 12px;border-radius:20px;cursor:pointer;font-family:var(--font-ar);font-size:0.8rem;">❌ لم أفهم</button>
-      <button onclick="Chatbot.handleFeedback('example')" style="background:#8B5CF6;color:white;border:none;padding:5px 12px;border-radius:20px;cursor:pointer;font-family:var(--font-ar);font-size:0.8rem;">💡 مثال آخر</button>`;
+      <div class="feedback-question">📊 كيف كان الشرح؟</div>
+      <div class="feedback-buttons">
+        <button class="feedback-btn understood" onclick="Chatbot.handleFeedback('understood')"><span>✅</span><span>فهمت!</span></button>
+        <button class="feedback-btn partial" onclick="Chatbot.handleFeedback('partial')"><span>🤔</span><span>نوعاً ما</span></button>
+        <button class="feedback-btn confused" onclick="Chatbot.handleFeedback('confused')"><span>❌</span><span>لم أفهم</span></button>
+        <button class="feedback-btn example" onclick="Chatbot.handleFeedback('example')"><span>💡</span><span>مثال آخر</span></button>
+      </div>
+      <div style="margin-top:8px;text-align:center;">
+        <button class="feedback-btn quiz" onclick="Chatbot.handleFeedback('quiz')" style="display:inline-flex;width:auto;padding:8px 16px;font-size:0.8rem;grid-column:unset;"><span>🧪</span><span>اختبرني</span></button>
+      </div>`;
     last.appendChild(fb);
+  },
+
+  getLastUserMessage() {
+    for (let i = this.state.conversationHistory.length - 1; i >= 0; i--) {
+      if (this.state.conversationHistory[i].role === 'user') {
+        return this.state.conversationHistory[i].parts[0].text;
+      }
+    }
+    return '';
   },
 
   handleFeedback(type) {
     const input = document.getElementById('chatbotInput');
-    const msgs = {
-      understood: 'رائع! فهمت الفكرة شكراً 🌟',
-      confused: 'لم أفهم! هل يمكنك شرح بطريقة مختلفة تماماً؟ 😅',
-      example: 'هل يمكنك إعطائي مثالاً آخر من الحياة اليومية؟ 💡'
-    };
-    input.value = msgs[type];
+    const lastMsg = this.getLastUserMessage();
+    const topic = this.detectTopic(lastMsg) || this.state.currentTopic || 'general';
+
     if (type === 'understood') {
+      if (typeof LearningStats !== 'undefined') {
+        LearningStats.trackUnderstanding(topic, 'understood');
+        const newA = LearningStats.checkAchievements(LearningStats.getStats());
+        if (newA.length > 0) {
+          setTimeout(() => this.showAchievementUnlocked(newA), 1000);
+        }
+      }
       setTimeout(() => {
-        this.addMessage('🎉 ممتاز! هل تريد التعمق في موضوع آخر؟', 'bot');
-        input.value = '';
+        this.showSuccessMessage();
       }, 500);
-    } else {
-      this.sendMessage();
+    } else if (type === 'partial') {
+      if (typeof LearningStats !== 'undefined') LearningStats.trackUnderstanding(topic, 'partial');
+      setTimeout(() => {
+        input.value = 'هل يمكنك تبسيط الشرح أكثر مع مثال من الحياة اليومية؟';
+        this.sendMessage();
+      }, 300);
+    } else if (type === 'confused') {
+      if (typeof LearningStats !== 'undefined') LearningStats.trackUnderstanding(topic, 'confused');
+      this.state.explanationCount++;
+      setTimeout(() => {
+        input.value = 'لم أفهم! اشرح بطريقة مختلفة تماماً كأنني طفل صغير 😅';
+        this.sendMessage();
+      }, 300);
+    } else if (type === 'example') {
+      setTimeout(() => {
+        input.value = 'أعطني مثالاً آخر مختلفاً من الحياة اليومية';
+        this.sendMessage();
+      }, 300);
+    } else if (type === 'quiz') {
+      if (typeof PersonalTutor !== 'undefined') {
+        PersonalTutor.askReviewQuestion(topic);
+      } else {
+        this.addMessage('🧪 لنختبر معلوماتك!', 'bot');
+      }
     }
+  },
+
+  addSuggestedNext() {
+    const msgs = document.getElementById('chatbotMessages');
+    const div = document.createElement('div');
+    div.className = 'feedback-container';
+    div.innerHTML = `
+      <div class="feedback-question">🚀 ماذا تريد أن تفعل الآن؟</div>
+      <div class="feedback-buttons">
+        <button class="feedback-btn next-topic" onclick="Chatbot.continueLearning()"><span>📚</span><span>أكمل التعلم</span></button>
+        <button class="feedback-btn quiz" onclick="Chatbot.handleFeedback('quiz')"><span>🧪</span><span>اختبرني</span></button>
+      </div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  },
+
+  continueLearning() {
+    const inp = document.getElementById('chatbotInput');
+    inp.value = 'ما هو الموضوع التالي الذي يجب أن أتعلمه؟';
+    this.sendMessage();
+  },
+
+  activateTutorMode() {
+    this.state.tutorMode = !this.state.tutorMode;
+    if (this.state.tutorMode) {
+      if (typeof PersonalTutor !== 'undefined') {
+        PersonalTutor.activateTutorMode();
+      } else {
+        this.addMessage('🎓 وضع المدرس الشخصي قيد التحميل... حاول مرة أخرى', 'bot');
+        this.state.tutorMode = false;
+      }
+    } else {
+      this.addMessage('✅ تم الخروج من وضع المدرس الشخصي', 'bot');
+    }
+    const btn = document.getElementById('tutorToggle');
+    if (btn) btn.style.opacity = this.state.tutorMode ? '1' : '0.6';
+  },
+
+  detectTopic(msg) {
+    const topics = [
+      ['adn','ADN','الاستنساخ','transcription'], ['الترجمة','traduction','ribosome','ARN'],
+      ['المناعة','مناعة','immunité','anticorps'], ['عصبون','العصبونات','communication nerveuse','تشابك'],
+      ['تركيب ضوئي','photosynthèse','كلوروفيل'], ['تنفس','respiration','mitochondrie','ATP'],
+      ['تكتوني','tectonique','زلزال','بركان'], ['إنزيم','enzyme','protéine'],
+      ['وراثة','génétique','جين','méiose'], ['انقسام','mitose','خلوي','cycle cellulaire']
+    ];
+    for (const group of topics) {
+      if (group.some(kw => msg.includes(kw))) return group[0];
+    }
+    return null;
+  },
+
+  showSuccessMessage() {
+    const msgs = document.getElementById('chatbotMessages');
+    const div = document.createElement('div');
+    div.className = 'message bot success-animation';
+    div.innerHTML = `
+      <div class="message-bubble" style="background:linear-gradient(135deg,#D1FAE5,#A7F3D0);border:2px solid #10B981;text-align:center;">
+        <div style="font-size:3rem;margin-bottom:8px;">🎉</div>
+        <strong style="font-size:1.1rem;">ممتاز! استمر بهذه الطريقة الرائعة!</strong>
+        <p style="margin-top:8px;">هل تريد:</p>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;">
+          <button onclick="PersonalTutor.changeTopic()" style="background:#2563EB;color:white;border:none;padding:8px 16px;border-radius:10px;cursor:pointer;font-family:var(--font-ar);font-weight:700;">📚 موضوع جديد</button>
+          <button onclick="PersonalTutor.askReviewQuestion(Chatbot.state.currentTopic||'transcription')" style="background:#8B5CF6;color:white;border:none;padding:8px 16px;border-radius:10px;cursor:pointer;font-family:var(--font-ar);font-weight:700;">🧪 اختبار</button>
+        </div>
+      </div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  },
+
+  showAchievementUnlocked(achievements) {
+    const msgs = document.getElementById('chatbotMessages');
+    achievements.forEach(a => {
+      const div = document.createElement('div');
+      div.className = 'message bot success-animation';
+      div.innerHTML = `
+        <div class="message-bubble" style="background:linear-gradient(135deg,#FFD700,#FFA500);border:2px solid #F59E0B;text-align:center;color:#1A2942;">
+          <div style="font-size:3rem;margin-bottom:8px;">🏆</div>
+          <strong>إنجاز جديد!</strong>
+          <h3 style="margin:8px 0;font-family:'Cairo',sans-serif;">${a.name}</h3>
+        </div>`;
+      msgs.appendChild(div);
+    });
+    msgs.scrollTop = msgs.scrollHeight;
   },
 
   showLimitReached() {
@@ -413,3 +561,5 @@ const Chatbot = {
 
 // Initialiser au chargement
 document.addEventListener('DOMContentLoaded', () => Chatbot.init());
+
+if (typeof window !== 'undefined') window.Chatbot = Chatbot;

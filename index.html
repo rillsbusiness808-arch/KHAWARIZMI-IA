@@ -23,10 +23,12 @@
   <link rel="stylesheet" href="css/program-structure.css">
   <link rel="stylesheet" href="css/unit-page.css">
   <link rel="stylesheet" href="css/chatbot.css">
+  <link rel="stylesheet" href="css/chatbot-enhanced.css">
   <link rel="stylesheet" href="css/fsrs.css">
   <link rel="stylesheet" href="css/concept-graph.css">
   <link rel="stylesheet" href="css/responsive.css">
   <link rel="stylesheet" href="css/khawarizmi-responsive.css">
+  <link rel="stylesheet" href="css/bac-tools.css">
   
   <link rel="icon" type="image/png" href="assets/logo.png">
 </head>
@@ -43,19 +45,18 @@
       </div>
     </a>
     
-    <ul class="nav-menu" id="navMenu">
+    <ul class="nav-menu" id="navLinks">
       <li><a href="#domains">المجالات</a></li>
       <li><a href="#program-toc">البرنامج</a></li>
       <li><a href="#revision">المراجعة</a></li>
       <li><a href="#graph">الخريطة</a></li>
-      <li class="nav-mobile-auth"><a href="connexion.html" class="btn-login">تسجيل الدخول</a></li>
-      <li class="nav-mobile-auth"><a href="inscription.html" class="btn-signup">إنشاء حساب 🚀</a></li>
+      <li><a href="pages/methodologie-bac.html">📝 أدوات BAC</a></li>
     </ul>
     
     <div class="nav-actions">
       <a href="connexion.html" class="btn-login">تسجيل الدخول</a>
       <a href="inscription.html" class="btn-signup">إنشاء حساب 🚀</a>
-      <button class="menu-toggle" id="menuToggle">☰</button>
+      <button class="menu-toggle" id="mobileToggle" aria-expanded="false" aria-label="فتح القائمة">☰</button>
     </div>
   </div>
 </nav>
@@ -163,6 +164,10 @@
           <li><a href="#program-toc">البرنامج</a></li>
           <li><a href="#revision">المراجعة الذكية</a></li>
           <li><a href="#graph">خريطة المفاهيم</a></li>
+          <li><a href="pages/methodologie-bac.html">📝 أدوات BAC</a></li>
+          <li><a href="pages/examen-simule.html">🎓 امتحان تجريبي</a></li>
+          <li><a href="pages/statistiques.html">📊 إحصائياتي</a></li>
+          <li><a href="pages/glossaire.html">📖 القاموس</a></li>
         </ul>
       </div>
       
@@ -186,6 +191,8 @@
 <!-- Scripts -->
 <script src="js/program-data.js"></script>
 <script src="js/navigation.js"></script>
+<script src="js/learning-stats.js"></script>
+<script src="js/personal-tutor.js"></script>
 <script src="js/knowledge-base.js"></script>
 <script src="js/gemini-api.js"></script>
 <script src="js/chatbot.js"></script>

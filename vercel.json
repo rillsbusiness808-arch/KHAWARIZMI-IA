@@ -1,8 +1,7 @@
 {
   "name": "khawarizmi",
   "version": 2,
-
-
+  "buildCommand": "node build.js",
 
 
 

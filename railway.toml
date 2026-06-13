@@ -2,7 +2,7 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "python run_migrations.py && python scripts/precompute_embeddings.py && python main.py"
+startCommand = "python run_migrations.py && python main.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 healthcheckGracePeriod = 180

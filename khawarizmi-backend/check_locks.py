@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 async def check_activity():
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
-        db_url = "postgresql+asyncpg://postgres:OxDIJWQlRMyyYdyKfElFdfJPXvsJNyRO@postgres.railway.internal:5432/railway"
+        raise ValueError("DATABASE_URL non défini.")
     else:
         if db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)

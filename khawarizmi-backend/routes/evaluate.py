@@ -2,13 +2,14 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from typing import Dict, Any, Optional, List
 
 from deps import get_current_user, get_db, get_openai, get_scheduler
+from rate_limit import limiter, evaluate_limit
 from services.llm import call_gpt4o_evaluator
 from services.fallback import fallback_safe_json
 from services.fallback_v2 import evaluate_l2
@@ -81,7 +82,9 @@ def normalize_result(result: dict) -> dict:
 # ═══════════════════════════════
 
 @router.post("/api/evaluate", response_model=EvaluateResponse)
+@limiter.limit(evaluate_limit)
 async def evaluate(
+    request:      Request,
     req:          EvaluateRequest,
     current_user: Dict           = Depends(get_current_user),
     db:           AsyncSession   = Depends(get_db),

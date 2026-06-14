@@ -2,17 +2,11 @@
 // khawarizmi-session.js
 // ═══════════════════════════════════════════════
 
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000'
-    : 'https://khawarizmi-ia-production.up.railway.app';
-
-function isDemoMode() {
-    const token = localStorage.getItem('khawarizmi_token');
-    if (token === 'demo_local_token') return true;
-    if (token) return false;
-    if (localStorage.getItem('khawarizmi_demo') === 'true') return true;
-    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-}
+const API_BASE = window.__KHW_API_BASE__ || (
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:8000'
+        : 'https://khawarizmi-ia-production.up.railway.app'
+);
 
 function getCurrentLang() {
     return localStorage.getItem('khawarizmi-lang') || 'fr';
@@ -168,11 +162,6 @@ function getToken() {
 }
 
 async function apiPost(endpoint, body) {
-    if (isDemoMode()) {
-        await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
-        return getMockResponse(endpoint, body);
-    }
-
     const res = await fetch(`${API_BASE}${endpoint}`, {
         method  : 'POST',
         headers : {
@@ -197,41 +186,6 @@ async function apiPost(endpoint, body) {
     if (!res.ok) throw new Error(`${res.status}`);
     return res.json();
 }
-
-function getMockResponse(endpoint, body) {
-    const lang = body.lang || getCurrentLang();
-    if (endpoint === '/api/session/next') {
-        const isAr = lang === 'ar';
-        return {
-            session_queue: [{
-                question_id : 'mock_ch1_01',
-                texte       : isAr
-                    ? 'اشرح دور ARN بوليميراز أثناء عملية النسخ عند حقيقيات النوى.'
-                    : "Explique le role de l'ARN polymerase lors de la transcription chez les eucaryotes.",
-                texte_ar    : 'اشرح دور ARN بوليميراز أثناء عملية النسخ عند حقيقيات النوى.',
-                concept_cle : isAr
-                    ? 'علوم طبيعية — تركيب البروتين'
-                    : 'SVT — Synthese des proteines',
-                tentative   : 1
-            }]
-        };
-    }
-    if (endpoint === '/api/evaluate') {
-        const reponse = body.reponse_eleve || '';
-        const score = reponse.length > 80 ? 8 : reponse.length > 30 ? 5 : 2;
-        return {
-            score   : score,
-            statut  : score >= 7 ? 'CORRECT' : score >= 4 ? 'PARTIEL' : 'FAUX',
-            feedback: score >= 7
-                ? 'Excellent ! Tu as bien decrit le role de l\'ARN polymetase.'
-                : 'Pense a mentionner : l\'ouverture de la double helice, la lecture du brin transcrit (3\'->5\'), la synthese de l\'ARNm (5\'->3\').',
-            manquant: score < 7 ? ['ARN polymerase', 'brin transcrit 3\'->5\'', 'ARNm 5\'->3\''] : [],
-            source  : 'MOCK'
-        };
-    }
-    return {};
-}
-
 
 // ═══════════════════════════════════════════════
 // LOGIQUE PRINCIPALE
@@ -633,12 +587,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (streakEl) streakEl.textContent  = `${streak} jours`;
     }
 
-    // Check if token exists or demo mode on load
+    // Check if token exists on load
     const hasToken = getToken();
-    if (hasToken || isDemoMode()) {
-        if (!hasToken) {
-            localStorage.setItem('khawarizmi_token', 'demo_local_token');
-        }
+    if (hasToken) {
         const hero = document.querySelector('.hero');
         if(hero) hero.style.display = 'none';
         const betaArea = document.getElementById('betaSessionArea');

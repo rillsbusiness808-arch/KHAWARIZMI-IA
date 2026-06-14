@@ -1,56 +1,25 @@
-"""
-deps.py — Dépendances partagées FastAPI (Khawarizmi)
------------------------------------------------------
-Ce module existe UNIQUEMENT pour casser le cycle d'import circulaire :
-    main.py → routes/*.py → main.py   (circular → crash)
-
-Il importe lazily depuis main.state et main.get_settings en utilisant
-des fonctions qui ne sont appelées qu'au moment de la requête, pas au
-chargement du module.
-
-Règle : ne jamais importer routes.* ici.
-"""
-
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Any, Optional
+from typing import Dict, Any
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from jose import JWTError, jwt
 
+from config import get_settings
 
-# ── Helpers lazy (évitent l'import top-level de main) ────────────────────────
 
 def _get_state():
-    """Retourne l'objet AppState de main sans l'importer au chargement."""
-    from main import state  # noqa: PLC0415 — import tardif intentionnel
+    from main import state
     return state
 
 
-def _get_cfg():
-    from main import get_settings  # noqa: PLC0415
-    return get_settings()
-
-
-# ── DB ────────────────────────────────────────────────────────────────────────
-
 async def get_db() -> AsyncSession:
-    """Injecte une session DB dans les routes."""
-    s = _get_state()
-    if not s.db_session:
-        raise HTTPException(503, "Base de données indisponible")
-    async with s.db_session() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+    from database import get_db as _get_db
+    async for session in _get_db():
+        yield session
 
-
-# ── Services ──────────────────────────────────────────────────────────────────
 
 def get_tutor():
     s = _get_state()
@@ -69,22 +38,15 @@ def get_scheduler():
 def get_openai():
     s = _get_state()
     if not s.openai:
-        raise HTTPException(503, "Service IA non configuré — clé API manquante")
+        raise HTTPException(503, "Service IA non configuré - clé API manquante")
     return s.openai
 
-
-def get_settings():
-    return _get_cfg()
-
-
-# ── Auth ──────────────────────────────────────────────────────────────────────
 
 async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Vérifie le JWT et retourne l'utilisateur courant."""
-    cfg = _get_cfg()
+    cfg = get_settings()
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Token invalide ou expiré",

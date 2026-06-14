@@ -408,9 +408,12 @@ function initWaitlistModal() {
 
             let saved = false;
 
-            const WEBHOOK_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? 'http://localhost:8000/api/waitlist'
-                : 'https://khawarizmi-ia-production-7837.up.railway.app/api/waitlist';
+            const API_BASE = window.__KHW_API_BASE__ || (
+                window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? 'http://localhost:8000'
+                    : 'https://khawarizmi-ia-production-7837.up.railway.app'
+            );
+            const WEBHOOK_URL = `${API_BASE}/api/waitlist`;
 
             if (WEBHOOK_URL) {
                 try {
@@ -444,11 +447,6 @@ function initWaitlistModal() {
                 } catch (storageErr) {
                     console.error('localStorage also failed:', storageErr);
                 }
-            }
-
-            // Demo token for local testing without backend
-            if (saved && !localStorage.getItem('khawarizmi_token')) {
-                localStorage.setItem('khawarizmi_token', 'demo_local_token');
             }
 
             /* ── 3. Confirmation visuelle ── */

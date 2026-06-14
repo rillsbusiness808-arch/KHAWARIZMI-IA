@@ -26,10 +26,7 @@ jobs:
       - name: Vérifier absence de secrets dans Git
         uses: trufflesecurity/trufflehog@main
         with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified
+          extra_args: --results=verified,unknown --debug
       - name: Vérifier .gitignore encodage UTF-8
         run: |
           file --mime-encoding .gitignore | grep -v utf-16 || \
